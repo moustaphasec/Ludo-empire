@@ -189,21 +189,26 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
   }
 
   return (
-    <div className="h-[100dvh] bg-[#241c2c] flex flex-col p-2 sm:p-4 relative overflow-hidden select-none">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent pointer-events-none" />
+    <div className="h-[100dvh] bg-[#1c2331] flex flex-col p-2 sm:p-4 relative overflow-hidden select-none">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/30 via-transparent to-transparent pointer-events-none" />
       
       {/* Header */}
-      <div className="relative z-10 w-full flex justify-between items-center mb-2 shrink-0">
-        <button onClick={onQuit} className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center border-2 border-slate-600 text-white shadow-lg hover:scale-105 active:scale-95 transition-transform">
+      <div className="relative z-10 w-full flex justify-between items-center mb-1 shrink-0">
+        <button onClick={onQuit} className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 text-white shadow-lg hover:bg-white/20 hover:scale-105 active:scale-95 transition-all">
            <LogOut size={20} />
         </button>
       </div>
 
       {/* Main Game Area */}
-      <div className="relative z-10 flex-1 min-h-0 w-full max-w-[500px] mx-auto flex flex-col justify-between items-center py-1 gap-2">
+      <div className="relative z-10 flex-1 min-h-0 w-full max-w-[600px] mx-auto flex flex-col justify-between items-center py-1 sm:py-2 gap-2 sm:gap-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-[2rem] p-4 shadow-[0_30px_60px_rgba(0,0,0,0.6)] my-2">
          
          {/* Top Players */}
-         <div className="flex justify-between w-full px-2 shrink-0">
+         <motion.div 
+           initial={{ y: -50, opacity: 0 }}
+           animate={{ y: 0, opacity: 1 }}
+           transition={{ duration: 0.6, type: 'spring', bounce: 0.4 }}
+           className="flex justify-between w-full px-1 sm:px-2 shrink-0"
+         >
             <PlayerCorner 
               color="green" 
               isCurrent={currentPlayerColor === 'green'} 
@@ -220,11 +225,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
               rolling={rolling} 
               isActive={players.includes('red')}
             />
-         </div>
+         </motion.div>
          
          {/* Board */}
-         <div className="w-full max-h-[60vh] aspect-square flex justify-center items-center shrink">
-            <div className="h-full aspect-square relative">
+         <motion.div 
+           initial={{ scale: 0.8, opacity: 0 }}
+           animate={{ scale: 1, opacity: 1 }}
+           transition={{ duration: 0.8, type: 'spring', bounce: 0.5, delay: 0.1 }}
+           className="w-full flex-1 max-h-[60vh] sm:max-h-[65vh] flex justify-center items-center shrink min-h-[300px]"
+         >
+            <div className="h-full aspect-square max-w-full relative shadow-[0_0_40px_rgba(0,0,0,0.5)] rounded-[20%] overflow-hidden ring-4 ring-white/10">
                <Board>
                  {gameState.tokens.map((token) => {
                    let row = 0, col = 0, offsetIndex = 0, totalOnCell = 1;
@@ -277,10 +287,15 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
                  })}
                </Board>
             </div>
-         </div>
+         </motion.div>
 
          {/* Bottom Players */}
-         <div className="flex justify-between w-full px-2 shrink-0">
+         <motion.div 
+           initial={{ y: 50, opacity: 0 }}
+           animate={{ y: 0, opacity: 1 }}
+           transition={{ duration: 0.6, type: 'spring', bounce: 0.4, delay: 0.2 }}
+           className="flex justify-between w-full px-1 sm:px-2 shrink-0"
+         >
             <PlayerCorner 
               color="yellow" 
               isCurrent={currentPlayerColor === 'yellow'} 
@@ -297,17 +312,17 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
               rolling={rolling} 
               isActive={players.includes('blue')}
             />
-         </div>
+         </motion.div>
       </div>
 
       {winner && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-slate-800 border-2 border-slate-600 p-8 rounded-2xl text-center shadow-[0_0_50px_rgba(255,215,0,0.5)] transform scale-110 text-white">
-            <h2 className="text-4xl font-black mb-4 text-yellow-400">Victoire!</h2>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white/10 border border-white/20 p-8 rounded-[2rem] text-center shadow-[0_0_50px_rgba(255,215,0,0.3)] transform scale-110 text-white w-full max-w-md">
+            <h2 className="text-5xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-br from-yellow-300 to-orange-500 drop-shadow-lg">Victoire!</h2>
             <p className="text-2xl mb-8 capitalize font-bold">Le joueur {winner} a gagné!</p>
             <button 
               onClick={onQuit}
-              className="bg-gradient-to-b from-[#4CAF50] to-[#2E7D32] border-[3px] border-[#8BC34A] text-white px-8 py-4 rounded-xl text-xl font-bold hover:scale-105 transition shadow-lg"
+              className="w-full bg-gradient-to-r from-[#4CAF50] to-[#8BC34A] border-2 border-[#8BC34A]/50 text-white px-8 py-4 rounded-2xl text-xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-[0_10px_20px_rgba(0,0,0,0.3)]"
             >
               Menu Principal
             </button>
@@ -326,42 +341,56 @@ const PlayerCorner = ({ color, isCurrent, gameState, handleRoll, rolling, isActi
   const stats = gameState.stats[color];
   const isComputerTurn = gameState.playerTypes[gameState.players[gameState.turnIndex]] === 'computer';
   
+  const bgGradients = {
+    green: 'from-[#4CAF50] to-[#2E7D32]',
+    red: 'from-[#F44336] to-[#C62828]',
+    blue: 'from-[#2196F3] to-[#1565C0]',
+    yellow: 'from-[#FFC107] to-[#F57F17]'
+  };
+
+  const ringColors = {
+    green: 'ring-[#4CAF50]/50 border-[#4CAF50]',
+    red: 'ring-[#F44336]/50 border-[#F44336]',
+    blue: 'ring-[#2196F3]/50 border-[#2196F3]',
+    yellow: 'ring-[#FFC107]/50 border-[#FFC107]'
+  };
+
   return (
-    <div className={`flex ${isLeft ? 'flex-row' : 'flex-row-reverse'} items-center gap-3 w-1/2 ${isLeft ? 'justify-start' : 'justify-end'} relative`}>
-       <div className={`flex flex-col items-center bg-slate-800/90 px-3 py-2 rounded-2xl border-[3px] transition-all shadow-xl
-         ${isCurrent ? `border-${color}-500 ring-4 ring-${color}-500/30 scale-105 z-20` : 'border-slate-700 opacity-90'}
+    <div className={`flex ${isLeft ? 'flex-row' : 'flex-row-reverse'} items-center gap-2 sm:gap-4 w-1/2 ${isLeft ? 'justify-start' : 'justify-end'} relative`}>
+       <div className={`flex flex-col items-center bg-white/5 backdrop-blur-md px-2 py-2 sm:px-3 sm:py-3 rounded-[1.25rem] border transition-all shadow-[0_10px_20px_rgba(0,0,0,0.3)]
+         ${isCurrent ? `border-transparent ring-4 ${ringColors[color]} scale-110 z-20` : 'border-white/10 opacity-80'}
        `}>
-          <div className="flex gap-3 text-white mb-2 bg-black/40 px-2 py-1 rounded-md w-full justify-center">
-             <span className="text-[11px] font-bold flex items-center gap-1">⚔️ {stats.captures}</span>
-             <span className="text-[11px] font-bold flex items-center gap-1">💀 {stats.lost}</span>
+          <div className="flex gap-2 text-white mb-2 bg-black/30 px-2 py-1 rounded-lg w-full justify-center">
+             <span className="text-[10px] sm:text-xs font-bold flex items-center gap-1">⚔️ {stats.captures}</span>
+             <span className="text-[10px] sm:text-xs font-bold flex items-center gap-1">💀 {stats.lost}</span>
           </div>
-          <div className={`w-14 h-14 rounded-xl flex items-center justify-center shadow-inner border border-white/30 bg-gradient-to-br ${
-             color === 'green' ? 'from-[#4CAF50] to-[#2E7D32]' :
-             color === 'red' ? 'from-[#F44336] to-[#C62828]' :
-             color === 'blue' ? 'from-[#2196F3] to-[#1565C0]' :
-             'from-[#FFEB3B] to-[#F57F17]'
-          }`}>
-             {type === 'human' ? <User size={28} className="text-white drop-shadow-md" /> : <Bot size={28} className="text-white drop-shadow-md" />}
+          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center shadow-inner border border-white/20 bg-gradient-to-br ${bgGradients[color]}`}>
+             {type === 'human' 
+               ? <User size={24} className="text-white drop-shadow-md sm:w-[32px] sm:h-[32px]" /> 
+               : <Bot size={24} className="text-white drop-shadow-md sm:w-[32px] sm:h-[32px]" />
+             }
           </div>
        </div>
 
        {isCurrent && (
-          <div className="flex items-center gap-2 z-30">
+          <div className="flex items-center gap-1 sm:gap-2 z-30">
              {!isLeft && !gameState.hasRolled && !isComputerTurn && !rolling && (
-                <motion.div animate={{ x: [0, -8, 0] }} transition={{ duration: 1, repeat: Infinity }} className="text-4xl drop-shadow-lg">
+                <motion.div animate={{ x: [0, -8, 0] }} transition={{ duration: 1, repeat: Infinity }} className="text-2xl sm:text-4xl drop-shadow-lg">
                    👉
                 </motion.div>
              )}
              
-             <Dice 
-               value={gameState.diceValue} 
-               rolling={rolling} 
-               onClick={!isComputerTurn && !gameState.hasRolled && !rolling ? handleRoll : undefined} 
-               color={color}
-             />
+             <div className="scale-75 sm:scale-100 origin-center">
+               <Dice 
+                 value={gameState.diceValue} 
+                 rolling={rolling} 
+                 onClick={!isComputerTurn && !gameState.hasRolled && !rolling ? handleRoll : undefined} 
+                 color={color}
+               />
+             </div>
              
              {isLeft && !gameState.hasRolled && !isComputerTurn && !rolling && (
-                <motion.div animate={{ x: [0, 8, 0] }} transition={{ duration: 1, repeat: Infinity }} className="text-4xl drop-shadow-lg">
+                <motion.div animate={{ x: [0, 8, 0] }} transition={{ duration: 1, repeat: Infinity }} className="text-2xl sm:text-4xl drop-shadow-lg">
                    👈
                 </motion.div>
              )}
