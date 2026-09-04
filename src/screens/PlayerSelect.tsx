@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { PlayerColor, PLAYER_COLORS } from '../game/constants';
-import { User, Bot, Play, Settings as SettingsIcon } from 'lucide-react';
+import { User, Bot, Play, ArrowLeft } from 'lucide-react';
+import { playSound } from '../utils/audio';
 
-export const PlayerSelect: React.FC<{ onStart: (players: PlayerColor[], types: Record<PlayerColor, 'human'|'computer'>) => void, onBack: () => void }> = ({ onStart, onBack }) => {
+export const PlayerSelect: React.FC<{
+  onStart: (players: PlayerColor[], types: Record<PlayerColor, 'human' | 'computer'>) => void;
+  onBack: () => void;
+}> = ({ onStart, onBack }) => {
   const [playerCount, setPlayerCount] = useState<2 | 3 | 4>(2);
-  const [types, setTypes] = useState<Record<PlayerColor, 'human'|'computer'>>({
+  const [types, setTypes] = useState<Record<PlayerColor, 'human' | 'computer'>>({
     green: 'human',
     red: 'computer',
     blue: 'computer',
@@ -12,93 +16,123 @@ export const PlayerSelect: React.FC<{ onStart: (players: PlayerColor[], types: R
   });
 
   const handleStart = () => {
+    playSound('click');
     let activePlayers: PlayerColor[] = [];
     if (playerCount === 2) activePlayers = ['green', 'blue']; // opposite corners
     if (playerCount === 3) activePlayers = ['green', 'red', 'blue'];
     if (playerCount === 4) activePlayers = ['green', 'red', 'blue', 'yellow'];
-    
+
     onStart(activePlayers, types);
   };
 
   const toggleType = (color: PlayerColor) => {
+    playSound('click');
     setTypes(prev => ({ ...prev, [color]: prev[color] === 'human' ? 'computer' : 'human' }));
   };
 
+  const handleSelectCount = (num: 2 | 3 | 4) => {
+    playSound('click');
+    setPlayerCount(num);
+  };
+
   return (
-    <div className="min-h-[100dvh] bg-[#1c2331] flex flex-col items-center justify-center p-4 sm:p-6 text-white font-sans relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/40 via-[#1c2331] to-[#1c2331] pointer-events-none" />
-      
-      <div className="relative z-10 w-full max-w-[400px] bg-white/5 backdrop-blur-xl border border-white/10 p-6 sm:p-8 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-        <h2 className="text-2xl sm:text-3xl font-black text-center mb-6 sm:mb-8 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 drop-shadow-md tracking-wide">
-          NOMBRE DE JOUEURS
+    <div className="min-h-[100dvh] bg-[#0d131f] flex flex-col items-center justify-center p-4 sm:p-6 text-white font-sans relative overflow-hidden select-none">
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/30 via-[#0d131f] to-[#0d131f] pointer-events-none" />
+
+      <div className="relative z-10 w-full max-w-[420px] bg-slate-900/80 backdrop-blur-2xl border-2 border-white/10 p-6 sm:p-8 rounded-[2.5rem] shadow-[0_25px_60px_rgba(0,0,0,0.8)]">
+        <h2 className="text-2xl sm:text-3xl font-black text-center mb-6 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500 drop-shadow-md tracking-wide">
+          CONFIGURATION
         </h2>
-        
+
         {/* Player Count Selection */}
-        <div className="flex justify-center gap-4 sm:gap-6 mb-8 sm:mb-10">
-          {[2, 3, 4].map(num => (
-            <button
-              key={num}
-              onClick={() => setPlayerCount(num as 2|3|4)}
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold border-2 sm:border-[3px] transition-all
-                ${playerCount === num 
-                  ? 'bg-indigo-600 border-indigo-400 shadow-[0_0_20px_rgba(79,70,229,0.5)] scale-110 text-white' 
-                  : 'bg-white/5 border-white/20 text-white/50 hover:bg-white/10 hover:border-white/30'
-                }
-              `}
-            >
-              {num}P
-            </button>
-          ))}
+        <div className="flex flex-col items-center mb-6 sm:mb-8">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Nombre de Joueurs</span>
+          <div className="flex justify-center gap-3 sm:gap-4 w-full">
+            {[2, 3, 4].map(num => (
+              <button
+                key={num}
+                onClick={() => handleSelectCount(num as 2 | 3 | 4)}
+                className={`flex-1 py-3 rounded-2xl flex items-center justify-center text-lg sm:text-xl font-black border-2 transition-all active:scale-95
+                  ${
+                    playerCount === num
+                      ? 'bg-gradient-to-tr from-amber-500 to-yellow-400 border-yellow-200 text-slate-950 shadow-[0_0_25px_rgba(234,179,8,0.5)] scale-105'
+                      : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:border-white/25'
+                  }
+                `}
+              >
+                {num} Joueurs
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Player Types Grid */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8 sm:mb-10 min-h-[220px]">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8 min-h-[200px]">
           {PLAYER_COLORS.map(color => {
-            const isActive = 
+            const isActive =
               (playerCount === 2 && (color === 'green' || color === 'blue')) ||
               (playerCount === 3 && color !== 'yellow') ||
-              (playerCount === 4);
-              
+              playerCount === 4;
+
             if (!isActive) return <div key={color} className="opacity-0 pointer-events-none transition-all duration-300" />;
 
             const bgGradients = {
-               green: 'from-[#4CAF50] to-[#2E7D32] border-[#8BC34A]/50',
-               red: 'from-[#F44336] to-[#C62828] border-[#EF5350]/50',
-               blue: 'from-[#2196F3] to-[#1565C0] border-[#64B5F6]/50',
-               yellow: 'from-[#FFC107] to-[#F57F17] border-[#FFD54F]/50'
+              green: 'from-[#10b981] to-[#047857] border-[#34d399]/70 text-emerald-100',
+              red: 'from-[#ef4444] to-[#b91c1c] border-[#f87171]/70 text-rose-100',
+              blue: 'from-[#3b82f6] to-[#1d4ed8] border-[#60a5fa]/70 text-blue-100',
+              yellow: 'from-[#eab308] to-[#a16207] border-[#fde047]/70 text-amber-100'
+            };
+
+            const labels: Record<PlayerColor, string> = {
+              green: 'Vert',
+              red: 'Rouge',
+              blue: 'Bleu',
+              yellow: 'Jaune'
             };
 
             return (
               <button
                 key={color}
                 onClick={() => toggleType(color)}
-                className={`p-3 sm:p-4 rounded-2xl flex flex-col items-center justify-center gap-2 border-2 bg-gradient-to-br shadow-lg transition-transform hover:scale-105 active:scale-95 ${bgGradients[color]}`}
+                className={`p-3.5 sm:p-4 rounded-2xl flex flex-col items-center justify-center gap-2 border-2 bg-gradient-to-br shadow-xl transition-all hover:scale-105 active:scale-95 ${bgGradients[color]}`}
               >
-                {types[color] === 'human' 
-                  ? <User size={40} className="text-white drop-shadow-md sm:w-[48px] sm:h-[48px]" /> 
-                  : <Bot size={40} className="text-white drop-shadow-md sm:w-[48px] sm:h-[48px]" />
-                }
-                <span className="text-white font-bold text-base sm:text-lg drop-shadow-md uppercase tracking-wider">
-                  {types[color] === 'human' ? 'Humain' : 'Ordi'}
-                </span>
+                <div className="text-[10px] uppercase font-black tracking-widest opacity-80">{labels[color]}</div>
+                {types[color] === 'human' ? (
+                  <User size={36} className="text-white drop-shadow sm:w-10 sm:h-10" />
+                ) : (
+                  <Bot size={36} className="text-white drop-shadow sm:w-10 sm:h-10" />
+                )}
+                <div className="bg-black/30 px-3 py-0.5 rounded-full text-white font-black text-xs uppercase tracking-wider">
+                  {types[color] === 'human' ? 'Humain' : 'Robot'}
+                </div>
               </button>
             );
           })}
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-between items-center gap-4">
-          <button onClick={onBack} className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20 hover:bg-white/20 active:scale-95 transition-all shadow-lg text-white">
-            <span className="text-3xl font-black rotate-180 drop-shadow-md">➜</span>
+        <div className="flex justify-between items-center gap-3 sm:gap-4">
+          <button
+            onClick={() => {
+              playSound('click');
+              onBack();
+            }}
+            className="w-14 h-14 bg-white/10 hover:bg-white/20 active:scale-95 rounded-2xl flex items-center justify-center border border-white/20 transition-all shadow-lg text-white"
+          >
+            <ArrowLeft size={24} />
           </button>
-          
-          <button onClick={handleStart} className="flex-1 h-14 bg-gradient-to-r from-[#4CAF50] to-[#8BC34A] rounded-2xl flex items-center justify-center gap-2 text-xl font-black border-2 border-[#8BC34A]/50 shadow-[0_0_20px_rgba(76,175,80,0.4)] hover:shadow-[0_0_30px_rgba(76,175,80,0.6)] hover:scale-[1.02] active:scale-95 transition-all tracking-widest text-white group overflow-hidden relative">
+
+          <button
+            onClick={handleStart}
+            className="flex-1 h-14 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 rounded-2xl flex items-center justify-center gap-2 text-xl font-black border-2 border-emerald-300/50 shadow-[0_0_25px_rgba(16,185,129,0.5)] hover:shadow-[0_0_35px_rgba(16,185,129,0.7)] hover:scale-[1.02] active:scale-95 transition-all tracking-widest text-white group overflow-hidden relative"
+          >
             <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent)] -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-            <span>JOUER</span>
-            <Play fill="currentColor" size={20} className="drop-shadow-md" />
+            <span>LANCER</span>
+            <Play fill="currentColor" size={20} className="drop-shadow" />
           </button>
         </div>
       </div>
     </div>
   );
 };
+

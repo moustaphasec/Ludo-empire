@@ -244,25 +244,89 @@ export const aiTakeTurn = (state: GameState): { action: 'roll' } | { action: 'mo
   
   const validTokens = getTokensWithMoves(state, currentPlayer);
   if (validTokens.length === 0) return null;
-  
-  // Pick random valid token and random destination for it
-  const token = validTokens[Math.floor(Math.random() * validTokens.length)];
-  const dests = getValidDestinations(token, state.diceValue!);
-  
-  // Try to capture if possible
+
+  type MoveChoice = { token: Token, destination: Token, score: number };
+  const choices: MoveChoice[] = [];
+
   for (const t of validTokens) {
-     const tDests = getValidDestinations(t, state.diceValue!);
-     for (const d of tDests) {
-        if (d.state === 'main' || d.state === 'detour') {
-           const coords = getTokenAbsoluteCoords(d)!;
-           if (!isSafeSquare(coords)) {
-              const hasEnemy = state.tokens.some(enemy => enemy.color !== currentPlayer && enemy.state !== 'base' && enemy.state !== 'finished' && getTokenAbsoluteCoords(enemy)?.[0] === coords[0] && getTokenAbsoluteCoords(enemy)?.[1] === coords[1]);
-              if (hasEnemy) return { action: 'move', tokenId: t.id, destination: d };
-           }
+    const dests = getValidDestinations(t, state.diceValue!);
+    for (const d of dests) {
+      let score = 0;
+      
+      // 1. Prioritize escaping detour (needs 6)
+      if (t.state === 'detour' && d.state === 'detour') {
+        score += 120;
+      }
+      if (t.state === 'detour' && d.state === 'main') {
+        score += 150; // Getting out is great
+      }
+
+      // 2. Prioritize reaching the finished state
+      if (d.state === 'finished') {
+        score += 200;
+      }
+
+      // 3. Prioritize captures (hunt)
+      if (d.state === 'main' || d.state === 'detour') {
+        const coords = getTokenAbsoluteCoords(d)!;
+        if (!isSafeSquare(coords)) {
+          const hasEnemy = state.tokens.some(enemy => 
+            enemy.color !== currentPlayer && 
+            enemy.state !== 'base' && 
+            enemy.state !== 'finished' && 
+            getTokenAbsoluteCoords(enemy)?.[0] === coords[0] && 
+            getTokenAbsoluteCoords(enemy)?.[1] === coords[1]
+          );
+          if (hasEnemy) {
+            score += 150;
+          }
         }
-     }
+      }
+
+      // 4. Leaving base on 6 is high priority
+      if (t.state === 'base' && d.state === 'main') {
+        score += 80;
+      }
+
+      // 5. Invasions are high reward if an opponent is in their stairs
+      if (d.state === 'detour' && t.state === 'main') {
+        const targetStretch = d.detourColor;
+        const hasPrey = state.tokens.some(enemy => 
+          enemy.color === targetStretch && 
+          enemy.state === 'home' && 
+          enemy.position >= d.position
+        );
+        if (hasPrey) {
+          score += 90; // Go hunt!
+        } else {
+          score -= 20; // Don't invade empty stairs
+        }
+      }
+
+      // 6. Safe spot preference
+      if (d.state === 'main') {
+        const coords = getTokenAbsoluteCoords(d)!;
+        if (isSafeSquare(coords)) {
+          score += 25;
+        }
+      }
+
+      // 7. General forward progress
+      if (d.state === 'main' && t.state === 'main') {
+        // Approximate forward progress
+        score += 5; 
+      }
+      if (d.state === 'home') {
+        score += 10 + d.position * 2;
+      }
+
+      choices.push({ token: t, destination: d, score });
+    }
   }
 
-  const dest = dests[Math.floor(Math.random() * dests.length)];
-  return { action: 'move', tokenId: token.id, destination: dest };
+  // Sort by highest score
+  choices.sort((a, b) => b.score - a.score);
+  const bestChoice = choices[0];
+
+  return { action: 'move', tokenId: bestChoice.token.id, destination: bestChoice.destination };
 };

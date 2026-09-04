@@ -14,71 +14,184 @@ interface TokenProps {
   isGhost?: boolean;
 }
 
-export const Token: React.FC<TokenProps> = ({ id, color, row, col, onClick, isPlayable, offsetIndex = 0, totalOnCell = 1, isGhost }) => {
+export const Token: React.FC<TokenProps> = ({
+  id,
+  color,
+  row,
+  col,
+  onClick,
+  isPlayable,
+  offsetIndex = 0,
+  totalOnCell = 1,
+  isGhost
+}) => {
   let offsetX = 0;
   let offsetY = 0;
-  
+
   if (totalOnCell > 1) {
-     const angle = (Math.PI * 2 * offsetIndex) / totalOnCell;
-     const radius = 0.25; 
-     offsetX = Math.cos(angle) * radius;
-     offsetY = Math.sin(angle) * radius;
+    const angle = (Math.PI * 2 * offsetIndex) / totalOnCell;
+    const radius = 0.28;
+    offsetX = Math.cos(angle) * radius;
+    offsetY = Math.sin(angle) * radius;
   }
 
   const top = `${((row + 0.5 + offsetY) / 15) * 100}%`;
   const left = `${((col + 0.5 + offsetX) / 15) * 100}%`;
 
+  // Gradients and colors config
+  const colorGradients = {
+    green: {
+      light: '#34d399',
+      mid: '#059669',
+      dark: '#064e3b',
+      glow: 'rgba(16, 185, 129, 0.6)',
+      ring: '#10b981'
+    },
+    red: {
+      light: '#f87171',
+      mid: '#dc2626',
+      dark: '#7f1d1d',
+      glow: 'rgba(239, 68, 68, 0.6)',
+      ring: '#ef4444'
+    },
+    blue: {
+      light: '#60a5fa',
+      mid: '#2563eb',
+      dark: '#1e3a8a',
+      glow: 'rgba(59, 130, 246, 0.6)',
+      ring: '#3b82f6'
+    },
+    yellow: {
+      light: '#fde047',
+      mid: '#d97706',
+      dark: '#78350f',
+      glow: 'rgba(234, 179, 8, 0.6)',
+      ring: '#eab308'
+    }
+  };
+
+  const currentTheme = colorGradients[color];
+
   return (
     <motion.div
       initial={{ scale: 0, opacity: 0 }}
       animate={{ top, left, scale: 1, opacity: 1 }}
-      transition={{ 
-        top: { type: 'spring', stiffness: 200, damping: 20, mass: 0.8 },
-        left: { type: 'spring', stiffness: 200, damping: 20, mass: 0.8 },
-        scale: { type: 'spring', stiffness: 300, damping: 15 }
+      transition={{
+        top: { type: 'spring', stiffness: 220, damping: 22, mass: 0.8 },
+        left: { type: 'spring', stiffness: 220, damping: 22, mass: 0.8 },
+        scale: { type: 'spring', stiffness: 350, damping: 18 }
       }}
       onClick={isPlayable || isGhost ? onClick : undefined}
-      className={`absolute w-[5%] h-[5%] -ml-[2.5%] -mt-[3.5%] pointer-events-auto flex items-center justify-center 
+      className={`absolute w-[5.5%] h-[5.5%] -ml-[2.75%] -mt-[3.75%] pointer-events-auto flex items-center justify-center 
         ${isPlayable ? 'cursor-pointer z-30 group' : 'z-20'}
-        ${isGhost ? 'opacity-50 cursor-pointer z-40 scale-75' : ''}
+        ${isGhost ? 'opacity-65 cursor-pointer z-40' : ''}
       `}
     >
-      <motion.div 
-        animate={isPlayable ? { y: [0, -10, 0] } : { y: 0 }} 
-        transition={{ duration: 0.8, repeat: isPlayable ? Infinity : 0, ease: "easeInOut" }}
-        className="w-full h-full absolute inset-0 flex items-center justify-center"
-      >
-        {isPlayable && (
-          <div className="absolute -bottom-2 w-full h-[30%] bg-black/40 rounded-full blur-[2px] animate-pulse" />
-        )}
-        <svg viewBox="0 0 100 100" className="w-[200%] h-[200%] absolute -top-[50%] -left-[50%] pointer-events-none drop-shadow-[0_8px_8px_rgba(0,0,0,0.6)] group-hover:scale-110 group-hover:drop-shadow-[0_12px_12px_rgba(0,0,0,0.8)] transition-all duration-300">
-           <defs>
-            <radialGradient id={`grad-${color}-${id}`} cx="35%" cy="30%" r="65%">
-              {color === 'green' && <><stop offset="0%" stopColor="#81c784"/><stop offset="100%" stopColor="#2e7d32"/></>}
-              {color === 'red' && <><stop offset="0%" stopColor="#e57373"/><stop offset="100%" stopColor="#c62828"/></>}
-              {color === 'blue' && <><stop offset="0%" stopColor="#64b5f6"/><stop offset="100%" stopColor="#1565c0"/></>}
-              {color === 'yellow' && <><stop offset="0%" stopColor="#fff59d"/><stop offset="100%" stopColor="#f57f17"/></>}
-            </radialGradient>
-         </defs>
-         {/* Base shadow */}
-         <ellipse cx="50" cy="85" rx="30" ry="10" fill="rgba(0,0,0,0.3)" />
-         {/* Base */}
-         <path d="M 25 78 C 25 70, 40 65, 50 65 C 60 65, 75 70, 75 78 C 75 88, 25 88, 25 78 Z" fill={`url(#grad-${color}-${id})`} stroke="rgba(0,0,0,0.4)" strokeWidth="1" />
-         {/* Body */}
-         <path d="M 38 66 L 43 45 C 43 45, 57 45, 57 45 L 62 66 Z" fill={`url(#grad-${color}-${id})`} />
-         {/* Collar */}
-         <ellipse cx="50" cy="45" rx="14" ry="4" fill={`url(#grad-${color}-${id})`} stroke="rgba(0,0,0,0.3)" strokeWidth="1" />
-         {/* Head */}
-         <circle cx="50" cy="27" r="15" fill={`url(#grad-${color}-${id})`} stroke="rgba(0,0,0,0.2)" strokeWidth="1" />
-         {/* Highlights */}
-         <ellipse cx="45" cy="22" rx="5" ry="3" fill="#ffffff" opacity="0.6" transform="rotate(-30 45 22)" />
-         <path d="M 43 62 L 46 48" stroke="#ffffff" strokeWidth="2" fill="none" opacity="0.4" strokeLinecap="round" />
-      </svg>
-      </motion.div>
-
-      {isGhost && (
-         <div className="absolute inset-0 rounded-full ring-4 ring-white animate-ping"></div>
+      {/* Ground Aura / Pulsing Ring when Playable */}
+      {isPlayable && (
+        <motion.div
+          animate={{ scale: [1, 1.45, 1], opacity: [0.8, 0.2, 0.8] }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -bottom-2 w-7 h-7 sm:w-9 sm:h-9 rounded-full border-2 border-yellow-300 bg-yellow-400/30 blur-[1px] pointer-events-none"
+        />
       )}
+
+      {/* Target Ghost Marker */}
+      {isGhost && (
+        <div className="absolute -bottom-1 w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 border-dashed border-white bg-white/30 animate-spin" style={{ animationDuration: '6s' }} />
+      )}
+
+      {/* Token Body Motion (Bobbing when playable) */}
+      <motion.div
+        animate={isPlayable ? { y: [0, -9, 0] } : { y: 0 }}
+        transition={{ duration: 0.9, repeat: isPlayable ? Infinity : 0, ease: 'easeInOut' }}
+        className="w-full h-full absolute inset-0 flex items-center justify-center transition-transform group-hover:scale-115"
+      >
+        {/* Ground Contact Shadow */}
+        <div className="absolute -bottom-1.5 w-6 h-2 sm:w-7 sm:h-2.5 bg-black/45 rounded-full blur-[2px] pointer-events-none" />
+
+        {/* 3D Pawn SVG */}
+        <svg
+          viewBox="0 0 100 130"
+          className="w-[220%] h-[220%] absolute -top-[65%] -left-[60%] pointer-events-none drop-shadow-[0_10px_10px_rgba(0,0,0,0.55)]"
+        >
+          <defs>
+            {/* Radial gradient for sphere head */}
+            <radialGradient id={`head-grad-${color}-${id}`} cx="32%" cy="28%" r="70%">
+              <stop offset="0%" stopColor={currentTheme.light} />
+              <stop offset="55%" stopColor={currentTheme.mid} />
+              <stop offset="100%" stopColor={currentTheme.dark} />
+            </radialGradient>
+
+            {/* Linear gradient for body stem */}
+            <linearGradient id={`body-grad-${color}-${id}`} x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor={currentTheme.dark} />
+              <stop offset="25%" stopColor={currentTheme.mid} />
+              <stop offset="55%" stopColor={currentTheme.light} />
+              <stop offset="85%" stopColor={currentTheme.mid} />
+              <stop offset="100%" stopColor={currentTheme.dark} />
+            </linearGradient>
+
+            {/* Gold metallic collar / base ring */}
+            <linearGradient id={`gold-ring-${id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#fef08a" />
+              <stop offset="50%" stopColor="#d97706" />
+              <stop offset="100%" stopColor="#78350f" />
+            </linearGradient>
+          </defs>
+
+          {/* 1. Base pedestal */}
+          <ellipse cx="50" cy="112" rx="34" ry="12" fill={`url(#gold-ring-${id})`} />
+          <ellipse cx="50" cy="108" rx="32" ry="11" fill={`url(#body-grad-${color}-${id})`} stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+
+          {/* 2. Lower body bevel */}
+          <path
+            d="M 24 108 C 26 95, 34 85, 42 75 L 58 75 C 66 85, 74 95, 76 108 Z"
+            fill={`url(#body-grad-${color}-${id})`}
+          />
+
+          {/* 3. Neck / Waist Ring (Gold Collar) */}
+          <ellipse cx="50" cy="74" rx="17" ry="5" fill={`url(#gold-ring-${id})`} stroke="rgba(0,0,0,0.3)" strokeWidth="0.5" />
+          <ellipse cx="50" cy="72" rx="15" ry="4" fill={`url(#body-grad-${color}-${id})`} />
+
+          {/* 4. Upper body stem */}
+          <path
+            d="M 40 73 C 41 62, 43 55, 45 46 L 55 46 C 57 55, 59 62, 60 73 Z"
+            fill={`url(#body-grad-${color}-${id})`}
+          />
+
+          {/* 5. Head Collar Bead */}
+          <ellipse cx="50" cy="46" rx="14" ry="4" fill={`url(#gold-ring-${id})`} />
+
+          {/* 6. Spherical Head */}
+          <circle
+            cx="50"
+            cy="26"
+            r="19"
+            fill={`url(#head-grad-${color}-${id})`}
+            stroke="rgba(0,0,0,0.25)"
+            strokeWidth="0.7"
+          />
+
+          {/* 7. Specular Glints & Candy Highlights */}
+          {/* Main off-center gloss spot */}
+          <ellipse cx="43" cy="19" rx="6" ry="3.5" fill="#ffffff" opacity="0.85" transform="rotate(-30 43 19)" />
+          {/* Secondary micro glint */}
+          <circle cx="51" cy="14" r="1.8" fill="#ffffff" opacity="0.6" />
+          {/* Body curved light sheen */}
+          <path
+            d="M 45 80 C 42 90, 36 98, 30 104"
+            stroke="#ffffff"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            fill="none"
+            opacity="0.45"
+          />
+          {/* Bottom rim bounce light */}
+          <ellipse cx="50" cy="114" rx="26" ry="4" fill="#ffffff" opacity="0.25" />
+        </svg>
+      </motion.div>
     </motion.div>
   );
 };
+
