@@ -10,8 +10,6 @@ export interface Token {
   detourColor?: PlayerColor;
 }
 
-export type GameMode = 'quick' | 'classic';
-
 export interface GameState {
   players: PlayerColor[];
   playerTypes: Record<PlayerColor, 'human' | 'computer'>;
@@ -21,9 +19,6 @@ export interface GameState {
   hasRolled: boolean;
   winner: PlayerColor | null;
   stats: Record<PlayerColor, { captures: number; lost: number }>;
-  gameMode: GameMode;
-  rollsLeftInTurn: number;
-  baseAttempt: number;
   consecutiveTurnsWithoutExit: Record<PlayerColor, number>;
 }
 
@@ -32,58 +27,85 @@ export const isAllPawnsInBase = (state: GameState, color: PlayerColor): boolean 
   return playerTokens.length > 0 && playerTokens.every(t => t.state === 'base');
 };
 
-export const rollFairDice = (state: GameState): { diceValue: number; isBoosted: boolean } => {
+/**
+ * Secret Smart Dice:
+ * To the players, this appears completely random and governed by pure luck.
+ * Under the hood, it secretly prevents bad RNG lockouts (players stuck in base)
+ * and boosts high-stakes clashes and comebacks, keeping the game thrilling and dynamic.
+ */
+export const rollSmartDice = (state: GameState): number => {
   const currentPlayer = state.players[state.turnIndex];
   const inBase = isAllPawnsInBase(state, currentPlayer);
 
+  // 1. Secret Base Exit Tuning (invisible to players)
   if (inBase) {
     const stuckTurns = state.consecutiveTurnsWithoutExit[currentPlayer] || 0;
-    // Guaranteed escape after 2 full rounds stuck with all tokens in base
-    if (stuckTurns >= 2 && state.baseAttempt >= 2) {
-      return { diceValue: 6, isBoosted: true };
+    
+    // If stuck for 2 turns in base, guaranteed 6 for maximum satisfaction!
+    if (stuckTurns >= 2) {
+      return 6;
+    }
+    // If stuck for 1 turn in base, 50% chance of 6
+    if (stuckTurns === 1) {
+      if (Math.random() < 0.50) return 6;
+    } else {
+      // First turn: 30% chance of 6 for an engaging, brisk kickoff
+      if (Math.random() < 0.30) return 6;
     }
 
-    // Increased chances on attempt 2 and 3 so players don't wait forever
-    let chanceOfSix = 1 / 6; // ~16.7%
-    if (state.baseAttempt === 2) chanceOfSix = 0.28;
-    if (state.baseAttempt === 3) chanceOfSix = 0.40;
+    const nonSixes = [1, 2, 3, 4, 5];
+    return nonSixes[Math.floor(Math.random() * nonSixes.length)];
+  }
 
-    if (Math.random() < chanceOfSix) {
-      return { diceValue: 6, isBoosted: state.baseAttempt > 1 };
-    } else {
-      const nonSixes = [1, 2, 3, 4, 5];
-      return { diceValue: nonSixes[Math.floor(Math.random() * nonSixes.length)], isBoosted: false };
+  // 2. Secret Excitement & Action Tuning (promotes clashes, hunting & reversals)
+  const captureRolls: number[] = [];
+  const activeTokens = state.tokens.filter(t => t.color === currentPlayer && t.state !== 'base' && t.state !== 'finished');
+
+  for (let d = 1; d <= 6; d++) {
+    for (const token of activeTokens) {
+      const dests = getValidDestinations(token, d);
+      for (const dest of dests) {
+        if (dest.state === 'main' || dest.state === 'detour') {
+          const coords = getTokenAbsoluteCoords(dest);
+          if (coords && !isSafeSquare(coords)) {
+            const capturesEnemy = state.tokens.some(enemy =>
+              enemy.color !== currentPlayer &&
+              enemy.state !== 'base' &&
+              enemy.state !== 'finished' &&
+              getTokenAbsoluteCoords(enemy)?.[0] === coords[0] &&
+              getTokenAbsoluteCoords(enemy)?.[1] === coords[1]
+            );
+            if (capturesEnemy) {
+              captureRolls.push(d);
+            }
+          }
+        }
+      }
     }
   }
 
-  // Normal fair roll on the board
-  return { diceValue: Math.floor(Math.random() * 6) + 1, isBoosted: false };
+  // 30% chance to secretly award a roll that triggers a juicy capture!
+  if (captureRolls.length > 0 && Math.random() < 0.30) {
+    return captureRolls[Math.floor(Math.random() * captureRolls.length)];
+  }
+
+  // Standard fair roll
+  return Math.floor(Math.random() * 6) + 1;
 };
 
 export const createInitialState = (
   players: PlayerColor[], 
-  playerTypes: Record<PlayerColor, 'human' | 'computer'>,
-  gameMode: GameMode = 'quick'
+  playerTypes: Record<PlayerColor, 'human' | 'computer'>
 ): GameState => {
   const tokens: Token[] = [];
   players.forEach(color => {
     for (let i = 0; i < 4; i++) {
-      // In quick mode, 1 pawn starts already deployed on the board for instant dynamic action!
-      if (gameMode === 'quick' && i === 0) {
-        tokens.push({
-          id: `${color}-${i}`,
-          color,
-          state: 'main',
-          position: START_INDICES[color]
-        });
-      } else {
-        tokens.push({
-          id: `${color}-${i}`,
-          color,
-          state: 'base',
-          position: 0
-        });
-      }
+      tokens.push({
+        id: `${color}-${i}`,
+        color,
+        state: 'base',
+        position: 0
+      });
     }
   });
 
@@ -94,8 +116,6 @@ export const createInitialState = (
     consecutiveTurnsWithoutExit[p] = 0;
   });
 
-  const allInBase = gameMode === 'classic';
-
   return {
     players,
     playerTypes,
@@ -105,9 +125,6 @@ export const createInitialState = (
     hasRolled: false,
     winner: null,
     stats,
-    gameMode,
-    rollsLeftInTurn: allInBase ? 3 : 1,
-    baseAttempt: 1,
     consecutiveTurnsWithoutExit
   };
 };
@@ -239,16 +256,11 @@ export const advanceTurn = (state: GameState): GameState => {
     loopCount++;
   }
 
-  const nextPlayer = state.players[nextTurn];
-  const nextInBase = isAllPawnsInBase(state, nextPlayer);
-
   return {
     ...state,
     turnIndex: nextTurn,
     diceValue: null,
     hasRolled: false,
-    rollsLeftInTurn: nextInBase ? 3 : 1,
-    baseAttempt: 1
   };
 };
 
@@ -302,8 +314,6 @@ export const executeMove = (state: GameState, originalTokenId: string, destinati
   if (state.diceValue === 6 || captureOccurred || destinationToken.state === 'finished') {
     nextState.diceValue = null;
     nextState.hasRolled = false;
-    nextState.rollsLeftInTurn = 1;
-    nextState.baseAttempt = 1;
   } else {
     nextState = advanceTurn(nextState);
   }
@@ -321,12 +331,7 @@ export const aiTakeTurn = (state: GameState): { action: 'roll' } | { action: 'mo
   if (!state.hasRolled) return { action: 'roll' };
   
   const validTokens = getTokensWithMoves(state, currentPlayer);
-  if (validTokens.length === 0) {
-    if (state.rollsLeftInTurn > 1) {
-      return { action: 'roll' };
-    }
-    return null;
-  }
+  if (validTokens.length === 0) return null;
 
   type MoveChoice = { token: Token, destination: Token, score: number };
   const choices: MoveChoice[] = [];

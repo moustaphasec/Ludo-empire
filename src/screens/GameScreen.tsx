@@ -6,7 +6,6 @@ import { ConfettiEffect, CelebrationType } from '../components/ConfettiEffect';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   GameState, 
-  GameMode,
   createInitialState, 
   executeMove, 
   getTokensWithMoves, 
@@ -15,7 +14,7 @@ import {
   getTokenAbsoluteCoords, 
   advanceTurn, 
   aiTakeTurn, 
-  rollFairDice,
+  rollSmartDice,
   isAllPawnsInBase,
   Token 
 } from '../game/engine';
@@ -32,7 +31,6 @@ import {
   ShieldAlert, 
   Trophy, 
   Sparkles,
-  Zap,
   X,
   Smile
 } from 'lucide-react';
@@ -41,7 +39,6 @@ import { playSound, isSoundEnabled, toggleSound } from '../utils/audio';
 interface GameScreenProps {
   players: PlayerColor[];
   playerTypes: Record<PlayerColor, 'human' | 'computer'>;
-  gameMode?: GameMode;
   onQuit: () => void;
 }
 
@@ -51,8 +48,8 @@ interface FloatingEmoji {
   color: PlayerColor;
 }
 
-export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, gameMode = 'quick', onQuit }) => {
-  const [gameState, setGameState] = useState<GameState>(createInitialState(players, playerTypes, gameMode));
+export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, onQuit }) => {
+  const [gameState, setGameState] = useState<GameState>(createInitialState(players, playerTypes));
   const [rolling, setRolling] = useState(false);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [animatingTokenId, setAnimatingTokenId] = useState<string | null>(null);
@@ -62,11 +59,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, ga
   const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
   const [celebration, setCelebration] = useState<{ type: CelebrationType; timestamp: number } | null>(null);
   const [isShaking, setIsShaking] = useState(false);
-  const [bannerMessage, setBannerMessage] = useState<string | null>(
-    gameMode === 'quick'
-      ? "⚡ Mode Rapide : Pions prêts, que la chasse commence !"
-      : "🎲 3 Essais en base : Obtenez un 6 pour libérer vos pions !"
-  );
+  const [bannerMessage, setBannerMessage] = useState<string | null>("🎲 Bienvenue ! Que la meilleure stratégie l'emporte !");
 
   const currentPlayerColor = gameState.players[gameState.turnIndex];
   const isComputerTurn = gameState.playerTypes[currentPlayerColor] === 'computer';
@@ -87,7 +80,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, ga
 
   const handleRestart = () => {
     playSound('click');
-    setGameState(createInitialState(players, playerTypes, gameMode));
+    setGameState(createInitialState(players, playerTypes));
     setSelectedTokenId(null);
     setAnimatingTokenId(null);
     setBannerMessage("🔄 Nouvelle partie lancée !");
@@ -193,25 +186,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, ga
                 setGameState(prev => executeMove(prev, aiAction.tokenId, aiAction.destination));
               }
             }
-          } else if (aiAction && aiAction.action === 'roll') {
-            // AI still has attempts left in base!
-            playSound('miss');
-            setBannerMessage(`❌ ${playerNames[currentPlayerColor]} rate le 6 (Essai ${gameState.baseAttempt}/3). Nouvelle tentative...`);
-            setGameState(prev => ({
-              ...prev,
-              hasRolled: false,
-              rollsLeftInTurn: prev.rollsLeftInTurn - 1,
-              baseAttempt: prev.baseAttempt + 1
-            }));
           } else if (!aiAction) {
-            // AI has no moves and no rolls left
+            // AI has no moves possible
             const inBase = isAllPawnsInBase(gameState, currentPlayerColor);
             playSound('miss');
-            if (inBase) {
-              setBannerMessage(`🔒 3 essais infructueux pour ${playerNames[currentPlayerColor]}. Tour suivant...`);
-            } else {
-              setBannerMessage(`Aucun coup possible pour ${playerNames[currentPlayerColor]}. Tour suivant...`);
-            }
+            setBannerMessage(`Dé : ${gameState.diceValue}. Aucun coup possible pour ${playerNames[currentPlayerColor]}. Tour suivant...`);
             setGameState(prev => {
               const nextConsecutive = { ...prev.consecutiveTurnsWithoutExit };
               if (inBase) {
@@ -227,39 +206,20 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, ga
       if (gameState.hasRolled && !animatingTokenId) {
         const validTokens = getTokensWithMoves(gameState, currentPlayerColor);
         if (validTokens.length === 0) {
-          // Human rolled but no moves possible
-          if (gameState.rollsLeftInTurn > 1) {
-            playSound('miss');
-            const attemptsLeft = gameState.rollsLeftInTurn - 1;
-            setBannerMessage(`❌ Pas de 6 (Essai ${gameState.baseAttempt}/3). Relancez le dé ! (${attemptsLeft} essai${attemptsLeft > 1 ? 's' : ''} restant${attemptsLeft > 1 ? 's' : ''})`);
-            const timer = setTimeout(() => {
-              setGameState(prev => ({
-                ...prev,
-                hasRolled: false,
-                rollsLeftInTurn: prev.rollsLeftInTurn - 1,
-                baseAttempt: prev.baseAttempt + 1
-              }));
-            }, 1000);
-            return () => clearTimeout(timer);
-          } else {
-            playSound('miss');
-            const inBase = isAllPawnsInBase(gameState, currentPlayerColor);
-            if (inBase) {
-              setBannerMessage(`🔒 3 essais infructueux pour ${playerNames[currentPlayerColor]}. Tour suivant...`);
-            } else {
-              setBannerMessage(`Aucun coup possible pour ${playerNames[currentPlayerColor]}. Tour suivant...`);
-            }
-            const timer = setTimeout(() => {
-              setGameState(prev => {
-                const nextConsecutive = { ...prev.consecutiveTurnsWithoutExit };
-                if (inBase) {
-                  nextConsecutive[currentPlayerColor] = (nextConsecutive[currentPlayerColor] || 0) + 1;
-                }
-                return advanceTurn({ ...prev, consecutiveTurnsWithoutExit: nextConsecutive });
-              });
-            }, 1300);
-            return () => clearTimeout(timer);
-          }
+          // Human has no moves possible
+          const inBase = isAllPawnsInBase(gameState, currentPlayerColor);
+          playSound('miss');
+          setBannerMessage(`Dé : ${gameState.diceValue}. Aucun coup possible pour ${playerNames[currentPlayerColor]}. Tour suivant...`);
+          const timer = setTimeout(() => {
+            setGameState(prev => {
+              const nextConsecutive = { ...prev.consecutiveTurnsWithoutExit };
+              if (inBase) {
+                nextConsecutive[currentPlayerColor] = (nextConsecutive[currentPlayerColor] || 0) + 1;
+              }
+              return advanceTurn({ ...prev, consecutiveTurnsWithoutExit: nextConsecutive });
+            });
+          }, 1100);
+          return () => clearTimeout(timer);
         } else if (validTokens.length === 1 && !selectedTokenId) {
           const moves = getValidMoves(validTokens[0], gameState.diceValue!);
           if (moves.length === 1) {
@@ -283,21 +243,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, ga
 
     setTimeout(() => {
       setRolling(false);
-      const { diceValue, isBoosted } = rollFairDice(gameState);
+      const diceValue = rollSmartDice(gameState);
       if (diceValue === 6) {
         playSound('six');
         triggerCelebration('six');
-        if (isBoosted) {
-          setBannerMessage(`🍀 COUP DE POUCE ! 6 magique accordé à ${playerNames[currentPlayerColor]} !`);
-        } else {
-          setBannerMessage(`🎉 6 OBTENU ! ${playerNames[currentPlayerColor]} libère un pion et rejoue !`);
-        }
+        setBannerMessage(`🎉 6 ! Quelle chance ! ${playerNames[currentPlayerColor]} rejoue !`);
       } else {
-        if (gameState.rollsLeftInTurn > 1) {
-          setBannerMessage(`Dé : ${diceValue}. Essai ${gameState.baseAttempt}/3 manqué.`);
-        } else {
-          setBannerMessage(`Dé : ${diceValue}. Choisissez un pion à avancer.`);
-        }
+        setBannerMessage(`Dé : ${diceValue}. Choisissez un pion à déplacer.`);
       }
       setGameState(prev => ({ ...prev, hasRolled: true, diceValue }));
     }, 550);
@@ -633,31 +585,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, ga
               </div>
 
               <div className="space-y-3.5 text-sm leading-relaxed text-slate-200">
-                <div className="bg-emerald-950/40 p-3.5 rounded-2xl border border-emerald-400/30">
-                  <h4 className="font-bold text-emerald-300 mb-1 flex items-center gap-1.5">
-                    <span>🎲</span> Règle des 3 Lancers & Sortie de Base
+                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10">
+                  <h4 className="font-bold text-emerald-400 mb-1 flex items-center gap-1.5">
+                    <span>🎲</span> Sortie de base & Déplacements
                   </h4>
-                  <p className="text-xs text-slate-200">
-                    Lorsque tous vos pions sont en base, vous bénéficiez de <strong>3 lancers consécutifs</strong> par tour pour tenter de faire un <strong>6</strong> ! Obtenir un 6 libère votre pion et vous donne un tour bonus immédiat.
-                  </p>
-                </div>
-
-                <div className="bg-amber-950/40 p-3.5 rounded-2xl border border-amber-400/30">
-                  <h4 className="font-bold text-amber-300 mb-1 flex items-center gap-1.5">
-                    <span>🛡️</span> Équité & Protection Anti-Poisse
-                  </h4>
-                  <p className="text-xs text-slate-200">
-                    Fini de rester coincé pendant que les autres avancent ! Si vous subissez 2 tours sans sortir, le destin vous accorde une chance boostée garantie pour que la partie reste équilibrée, fun et dynamique pour tous.
-                  </p>
-                </div>
-
-                <div className="bg-cyan-950/40 p-3.5 rounded-2xl border border-cyan-400/30">
-                  <h4 className="font-bold text-cyan-300 mb-1 flex items-center gap-1.5">
-                    <span>⚡</span> Deux Modes de Jeu au Choix
-                  </h4>
-                  <p className="text-xs text-slate-200">
-                    <strong>Mode Rapide :</strong> 1 pion démarre déjà sur le terrain pour une action immédiate dès la première seconde !<br />
-                    <strong>Mode Classique :</strong> Tous les pions démarrent en base avec les 3 lancers par tour.
+                  <p className="text-xs text-slate-300">
+                    Faites un <strong>6</strong> au dé pour faire sortir un pion de votre maison sur le plateau. Chaque 6 vous accorde un tour supplémentaire immédiat !
                   </p>
                 </div>
 
@@ -666,7 +599,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, ga
                     <span>⭐</span> Cases Étoilées Sécurisées
                   </h4>
                   <p className="text-xs text-slate-300">
-                    Les cases marquées d'une étoile dorée étincelante sont des havres de paix : aucun pion ne peut y être capturé !
+                    Les cases marquées d'une étoile dorée étincelante sont des zones de paix : aucun pion ne peut y être capturé !
+                  </p>
+                </div>
+
+                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10">
+                  <h4 className="font-bold text-cyan-400 mb-1 flex items-center gap-1.5">
+                    <span>🎯</span> Captures & Lancer Bonus
+                  </h4>
+                  <p className="text-xs text-slate-300">
+                    Atterrissez sur la case d'un pion ennemi pour le renvoyer chez lui ! Toute capture réussie vous récompense d'un nouveau lancer immédiat.
                   </p>
                 </div>
 
@@ -833,54 +775,28 @@ const PlayerCorner: React.FC<PlayerCornerProps> = ({
 
       {/* DICE AREA (Only for Current Player) */}
       {isCurrent && (
-        <div className="flex flex-col items-center gap-1 z-30">
-          {/* Base Attempts Badge (3 Rolls when all in Base) */}
-          {isAllPawnsInBase(gameState, color) && (
-            <div className="bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full border border-amber-400/50 shadow-lg text-[9px] font-black text-amber-300 flex items-center gap-1.5 animate-pulse">
-              <span>🎯 Essai {gameState.baseAttempt}/3</span>
-              <div className="flex items-center gap-1">
-                {[1, 2, 3].map(step => (
-                  <div
-                    key={step}
-                    className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-                      step === gameState.baseAttempt
-                        ? 'bg-amber-400 ring-1 ring-amber-200 scale-125'
-                        : step < gameState.baseAttempt
-                        ? 'bg-slate-600'
-                        : 'bg-white/30'
-                    }`}
-                  />
-                ))}
-              </div>
-              {gameState.consecutiveTurnsWithoutExit[color] >= 2 && (
-                <span className="text-[8px] text-emerald-400 font-black">🍀 Chance</span>
-              )}
-            </div>
+        <div className="flex items-center gap-1.5 sm:gap-2 z-30">
+          {!isLeft && !gameState.hasRolled && !isComputerTurn && !rolling && (
+            <motion.div animate={{ x: [0, -6, 0] }} transition={{ duration: 0.9, repeat: Infinity }} className="text-xl sm:text-2xl drop-shadow">
+              👉
+            </motion.div>
           )}
 
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            {!isLeft && !gameState.hasRolled && !isComputerTurn && !rolling && (
-              <motion.div animate={{ x: [0, -6, 0] }} transition={{ duration: 0.9, repeat: Infinity }} className="text-xl sm:text-2xl drop-shadow">
-                👉
-              </motion.div>
-            )}
-
-            <div className="scale-85 sm:scale-100 origin-center">
-              <Dice
-                value={gameState.diceValue}
-                rolling={rolling}
-                onClick={!isComputerTurn && !gameState.hasRolled && !rolling ? handleRoll : undefined}
-                color={color}
-                canRoll={!gameState.hasRolled && !rolling}
-              />
-            </div>
-
-            {isLeft && !gameState.hasRolled && !isComputerTurn && !rolling && (
-              <motion.div animate={{ x: [0, 6, 0] }} transition={{ duration: 0.9, repeat: Infinity }} className="text-xl sm:text-2xl drop-shadow">
-                👈
-              </motion.div>
-            )}
+          <div className="scale-85 sm:scale-100 origin-center">
+            <Dice
+              value={gameState.diceValue}
+              rolling={rolling}
+              onClick={!isComputerTurn && !gameState.hasRolled && !rolling ? handleRoll : undefined}
+              color={color}
+              canRoll={!gameState.hasRolled && !rolling}
+            />
           </div>
+
+          {isLeft && !gameState.hasRolled && !isComputerTurn && !rolling && (
+            <motion.div animate={{ x: [0, 6, 0] }} transition={{ duration: 0.9, repeat: Infinity }} className="text-xl sm:text-2xl drop-shadow">
+              👈
+            </motion.div>
+          )}
         </div>
       )}
     </div>

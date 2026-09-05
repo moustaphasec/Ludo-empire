@@ -9,7 +9,6 @@ import { PlayerSelect } from './screens/PlayerSelect';
 import { GameScreen } from './screens/GameScreen';
 import { Online } from './screens/Online';
 import { PlayerColor } from './game/constants';
-import { GameMode } from './game/engine';
 
 type Screen = 'home' | 'player_select' | 'game' | 'online';
 
@@ -17,16 +16,13 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [players, setPlayers] = useState<PlayerColor[]>([]);
   const [playerTypes, setPlayerTypes] = useState<Record<PlayerColor, 'human' | 'computer'>>({} as any);
-  const [gameMode, setGameMode] = useState<GameMode>('quick');
 
   const handleStartGame = (
     selectedPlayers: PlayerColor[], 
-    selectedTypes: Record<PlayerColor, 'human' | 'computer'>,
-    selectedMode: GameMode = 'quick'
+    selectedTypes: Record<PlayerColor, 'human' | 'computer'>
   ) => {
     setPlayers(selectedPlayers);
     setPlayerTypes(selectedTypes);
-    setGameMode(selectedMode);
     setCurrentScreen('game');
   };
 
@@ -48,7 +44,6 @@ export default function App() {
         <GameScreen 
           players={players} 
           playerTypes={playerTypes} 
-          gameMode={gameMode}
           onQuit={() => setCurrentScreen('home')} 
         />
       )}
