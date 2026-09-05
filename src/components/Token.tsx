@@ -12,6 +12,7 @@ interface TokenProps {
   offsetIndex?: number;
   totalOnCell?: number;
   isGhost?: boolean;
+  isHunter?: boolean;
 }
 
 export const Token: React.FC<TokenProps> = ({
@@ -23,7 +24,8 @@ export const Token: React.FC<TokenProps> = ({
   isPlayable,
   offsetIndex = 0,
   totalOnCell = 1,
-  isGhost
+  isGhost,
+  isHunter
 }) => {
   let offsetX = 0;
   let offsetY = 0;
@@ -88,7 +90,7 @@ export const Token: React.FC<TokenProps> = ({
       `}
     >
       {/* Ground Aura / Pulsing Ring when Playable */}
-      {isPlayable && (
+      {isPlayable && !isHunter && (
         <motion.div
           animate={{ scale: [1, 1.45, 1], opacity: [0.8, 0.2, 0.8] }}
           transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
@@ -96,9 +98,41 @@ export const Token: React.FC<TokenProps> = ({
         />
       )}
 
+      {/* Predator / Hunter Aura in Enemy Stairs */}
+      {isHunter && !isGhost && (
+        <>
+          <motion.div
+            animate={{ scale: [1, 1.4, 1], opacity: [0.9, 0.4, 0.9] }}
+            transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute -bottom-2 w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-rose-500 bg-rose-600/35 blur-[2px] pointer-events-none"
+          />
+          <motion.div
+            animate={{ y: [-3, 1, -3] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute -top-6 px-1.5 py-0.5 rounded-full bg-rose-950/95 border border-rose-500/80 text-[9px] font-black text-rose-300 flex items-center gap-1 shadow-lg pointer-events-none z-50 whitespace-nowrap"
+          >
+            <span>⚔️</span>
+            <span>CHASSEUR</span>
+          </motion.div>
+        </>
+      )}
+
       {/* Target Ghost Marker */}
       {isGhost && (
-        <div className="absolute -bottom-1 w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 border-dashed border-white bg-white/30 animate-spin" style={{ animationDuration: '6s' }} />
+        <>
+          <div
+            className={`absolute -bottom-1 w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 border-dashed ${
+              isHunter ? 'border-rose-400 bg-rose-600/40' : 'border-white bg-white/30'
+            } animate-spin`}
+            style={{ animationDuration: isHunter ? '4s' : '6s' }}
+          />
+          {isHunter && (
+            <div className="absolute -top-5 px-1.5 py-0.5 rounded-md bg-rose-950/95 border border-rose-500 text-[8px] font-black text-rose-200 flex items-center gap-0.5 shadow-md pointer-events-none whitespace-nowrap">
+              <span>⚔️</span>
+              <span>CHASSE</span>
+            </div>
+          )}
+        </>
       )}
 
       {/* Token Body Motion (Bobbing when playable) */}

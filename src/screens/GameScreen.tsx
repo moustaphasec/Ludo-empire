@@ -114,7 +114,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
 
     // Detect invasion
     if (move.destination.state === 'detour') {
-      setBannerMessage(`⚔️ INVASION ! ${playerNames[move.destination.color]} traque l'adversaire dans son escalier !`);
+      playSound('invasion');
+      const victimName = move.destination.detourColor ? playerNames[move.destination.detourColor] : 'l\'adversaire';
+      setBannerMessage(`⚔️ INVASION ! ${playerNames[move.destination.color]} s'infiltre dans l'escalier de ${victimName} !`);
     }
 
     const applyFinalMove = (prev: GameState) => {
@@ -122,10 +124,18 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
       const prevCaptures = prev.stats[move.destination.color]?.captures || 0;
       const nextCaptures = next.stats[move.destination.color]?.captures || 0;
       if (nextCaptures > prevCaptures) {
-        playSound('capture');
-        triggerCelebration('capture');
         triggerShake();
-        setBannerMessage(`💥 BOOM ! ${playerNames[move.destination.color]} a éliminé un pion ! Rejouez !`);
+        if (move.destination.state === 'detour') {
+          playSound('capture');
+          playSound('six');
+          triggerCelebration('win');
+          const victimName = move.destination.detourColor ? playerNames[move.destination.detourColor] : 'l\'adversaire';
+          setBannerMessage(`⚔️💥 CHASSE ROYALE ! ${playerNames[move.destination.color]} a dévoré le pion de ${victimName} DANS SON PROPRE ESCALIER ! Rejouez !`);
+        } else {
+          playSound('capture');
+          triggerCelebration('capture');
+          setBannerMessage(`💥 BOOM ! ${playerNames[move.destination.color]} a éliminé un pion ! Rejouez !`);
+        }
       } else if (next.winner) {
         playSound('win');
         triggerCelebration('win');
@@ -281,7 +291,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
 
     const moves = getValidMoves(token, gameState.diceValue!);
     const move = moves.find(
-      m => m.destination.state === destination.state && m.destination.position === destination.position
+      m =>
+        m.destination.state === destination.state &&
+        m.destination.position === destination.position &&
+        (m.destination.state !== 'detour' || m.destination.detourColor === destination.detourColor)
     );
 
     if (move) {
@@ -490,6 +503,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
                 }
 
                 const isPlayable = validPlayableTokens.some(t => t.id === token.id);
+                const isHunter = token.state === 'detour';
 
                 return (
                   <TokenComponent
@@ -501,6 +515,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
                     totalOnCell={totalOnCell}
                     offsetIndex={offsetIndex}
                     isPlayable={isPlayable && !selectedTokenId && !animatingTokenId}
+                    isHunter={isHunter}
                     onClick={() => handleTokenClick(token.id)}
                   />
                 );
@@ -510,6 +525,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
               {ghostDestinations.map((dest, idx) => {
                 const coords = getTokenAbsoluteCoords(dest);
                 if (!coords) return null;
+                const isHunterTarget = dest.state === 'detour';
                 return (
                   <TokenComponent
                     key={`ghost-${idx}`}
@@ -518,6 +534,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
                     row={coords[0]}
                     col={coords[1]}
                     isGhost={true}
+                    isHunter={isHunterTarget}
                     onClick={() => handleGhostClick(dest)}
                   />
                 );
@@ -615,16 +632,21 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
                 <div className="bg-gradient-to-br from-rose-900/40 to-amber-900/40 p-3.5 rounded-2xl border-2 border-rose-500/50 shadow-inner">
                   <h4 className="font-black text-rose-300 text-base mb-1 flex items-center gap-2">
                     <Swords size={18} className="text-rose-400" />
-                    Règle Exclusive : Invasion & Chasse !
+                    Règle Exclusive : Invasion & Chasse Royale !
                   </h4>
                   <p className="text-xs text-rose-100 mb-1.5">
-                    Lorsque vous atteignez l'entrée de l'escalier d'un adversaire, vous pouvez <strong>entrer dans son escalier</strong> pour le traquer et le capturer chez lui !
+                    Lorsque vous passez devant l'entrée de l'escalier d'un adversaire, infiltrez son sanctuaire pour traquer et <strong>capturer ses pions chez lui</strong> !
                   </p>
-                  <div className="flex items-start gap-2 bg-black/40 p-2 rounded-xl border border-rose-400/30 text-xs">
+                  <div className="flex items-start gap-2 bg-black/40 p-2.5 rounded-xl border border-rose-400/30 text-xs">
                     <ShieldAlert size={16} className="text-amber-400 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>Pour redescendre :</strong> Après l'invasion, pour vous échapper de l'escalier ennemi, vous devez obtenir un <strong>6</strong> par marche !
-                    </span>
+                    <div className="space-y-1">
+                      <p>
+                        <strong>🗡️ Chasse :</strong> Progressez marche après marche pour dévorer le pion adverse. Toute capture réussie dans l'escalier accorde un <strong>lancer bonus immédiat</strong> !
+                      </p>
+                      <p>
+                        <strong>🏃 Repli & Sprint :</strong> Vous pouvez redescendre pas à pas vers la sortie, ou utiliser un <strong>6</strong> pour sprinter directement sur le grand circuit !
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -11,7 +11,7 @@ export const setSoundEnabled = (enabled: boolean) => {
   soundEnabled = enabled;
 };
 
-export const playSound = (type: 'roll' | 'move' | 'capture' | 'win' | 'six' | 'click' | 'miss' | 'bonus') => {
+export const playSound = (type: 'roll' | 'move' | 'capture' | 'win' | 'six' | 'click' | 'miss' | 'bonus' | 'invasion') => {
   if (!soundEnabled) return;
 
   try {
@@ -138,6 +138,22 @@ export const playSound = (type: 'roll' | 'move' | 'capture' | 'win' | 'six' | 'c
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
       osc.start();
       osc.stop(ctx.currentTime + 0.03);
+    } else if (type === 'invasion') {
+      // Dramatic battle horns / double brass chord for stairs invasion
+      const notes = [220, 277.18, 329.63, 440];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sawtooth';
+        const start = ctx.currentTime + idx * 0.07;
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.18, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
+        osc.start(start);
+        osc.stop(start + 0.22);
+      });
     }
   } catch (e) {
     console.error('Audio play failed', e);

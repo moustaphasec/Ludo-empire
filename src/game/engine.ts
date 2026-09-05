@@ -57,36 +57,45 @@ export const rollSmartDice = (state: GameState): number => {
     return nonSixes[Math.floor(Math.random() * nonSixes.length)];
   }
 
-  // 2. Secret Excitement & Action Tuning (promotes clashes, hunting & reversals)
-  const captureRolls: number[] = [];
+  // 2. Secret Excitement & Action Tuning (promotes clashes, hunting & stair invasions!)
+  const stairCaptureRolls: number[] = [];
+  const normalCaptureRolls: number[] = [];
   const activeTokens = state.tokens.filter(t => t.color === currentPlayer && t.state !== 'base' && t.state !== 'finished');
 
   for (let d = 1; d <= 6; d++) {
     for (const token of activeTokens) {
       const dests = getValidDestinations(token, d);
       for (const dest of dests) {
-        if (dest.state === 'main' || dest.state === 'detour') {
-          const coords = getTokenAbsoluteCoords(dest);
-          if (coords && !isSafeSquare(coords)) {
-            const capturesEnemy = state.tokens.some(enemy =>
-              enemy.color !== currentPlayer &&
-              enemy.state !== 'base' &&
-              enemy.state !== 'finished' &&
-              getTokenAbsoluteCoords(enemy)?.[0] === coords[0] &&
-              getTokenAbsoluteCoords(enemy)?.[1] === coords[1]
-            );
-            if (capturesEnemy) {
-              captureRolls.push(d);
-            }
+        const coords = getTokenAbsoluteCoords(dest);
+        if (!coords || isSafeSquare(coords)) continue;
+
+        const capturesEnemy = state.tokens.some(enemy =>
+          enemy.color !== currentPlayer &&
+          enemy.state !== 'base' &&
+          enemy.state !== 'finished' &&
+          getTokenAbsoluteCoords(enemy)?.[0] === coords[0] &&
+          getTokenAbsoluteCoords(enemy)?.[1] === coords[1]
+        );
+
+        if (capturesEnemy) {
+          if (dest.state === 'detour') {
+            stairCaptureRolls.push(d);
+          } else {
+            normalCaptureRolls.push(d);
           }
         }
       }
     }
   }
 
-  // 30% chance to secretly award a roll that triggers a juicy capture!
-  if (captureRolls.length > 0 && Math.random() < 0.30) {
-    return captureRolls[Math.floor(Math.random() * captureRolls.length)];
+  // High-stakes boost: 55% chance to award a roll that triggers an invasion capture in opponent's stairs!
+  if (stairCaptureRolls.length > 0 && Math.random() < 0.55) {
+    return stairCaptureRolls[Math.floor(Math.random() * stairCaptureRolls.length)];
+  }
+
+  // 35% chance to award a regular track capture
+  if (normalCaptureRolls.length > 0 && Math.random() < 0.35) {
+    return normalCaptureRolls[Math.floor(Math.random() * normalCaptureRolls.length)];
   }
 
   // Standard fair roll
@@ -153,17 +162,75 @@ export const getValidMoves = (token: Token, diceValue: number): { destination: T
   
   if (token.state === 'finished') return [];
 
-  if (token.state === 'detour') {
-    if (diceValue === 6) {
-      if (token.position > 0) {
-        const dest = { ...token, state: 'detour', position: token.position - 1, detourColor: token.detourColor } as Token;
-        return [{ destination: dest, path: [dest] }];
+  if (token.state === 'detour' && token.detourColor) {
+    const results: { destination: Token, path: Token[] }[] = [];
+    const detourColor = token.detourColor;
+
+    // 1. CHASSE EN AVANT (Hunt deeper up the enemy stairs)
+    let forwardPos = token.position;
+    let forwardDir = 1;
+    const forwardHistory: Token[] = [];
+    for (let s = 0; s < diceValue; s++) {
+      let nextPos = forwardPos + forwardDir;
+      if (nextPos >= 5) {
+        forwardDir = -1;
+        nextPos = 3; // Bounce back from top (cannot enter victory center)
+      } else if (nextPos < 0) {
+        forwardDir = 1;
+        nextPos = 1;
+      }
+      forwardPos = nextPos;
+      forwardHistory.push({ ...token, state: 'detour', position: forwardPos, detourColor });
+    }
+    if (forwardHistory.length > 0) {
+      results.push({ destination: forwardHistory[forwardHistory.length - 1], path: forwardHistory });
+    }
+
+    // 2. REPLI VERS LA SORTIE (Retreat / step down towards the entrance)
+    let retreatPos = token.position;
+    const retreatHistory: Token[] = [];
+    let hasExited = false;
+    for (let s = 0; s < diceValue; s++) {
+      if (!hasExited) {
+        retreatPos--;
+        if (retreatPos < 0) {
+          hasExited = true;
+          const exitMain = ENTRANCES[detourColor];
+          retreatHistory.push({ ...token, state: 'main', position: exitMain, detourColor: undefined });
+        } else {
+          retreatHistory.push({ ...token, state: 'detour', position: retreatPos, detourColor });
+        }
       } else {
-        const dest = { ...token, state: 'main', position: ENTRANCES[token.detourColor!] } as Token;
-        return [{ destination: dest, path: [dest] }];
+        const lastPos = retreatHistory[retreatHistory.length - 1].position;
+        const nextPos = (lastPos + 1) % 52;
+        retreatHistory.push({ ...token, state: 'main', position: nextPos, detourColor: undefined });
       }
     }
-    return []; // Cannot move out without a 6
+    if (retreatHistory.length > 0) {
+      const retreatDest = retreatHistory[retreatHistory.length - 1];
+      const alreadyHas = results.some(
+        r => r.destination.state === retreatDest.state &&
+             r.destination.position === retreatDest.position &&
+             r.destination.detourColor === retreatDest.detourColor
+      );
+      if (!alreadyHas) {
+        results.push({ destination: retreatDest, path: retreatHistory });
+      }
+    }
+
+    // 3. SPRINT D'ÉVASION SUR UN 6 (Instant direct exit onto main track)
+    if (diceValue === 6) {
+      const exitMain = ENTRANCES[detourColor];
+      const sprintPath = [{ ...token, state: 'main' as TokenState, position: exitMain, detourColor: undefined }];
+      const alreadyHas = results.some(
+        r => r.destination.state === 'main' && r.destination.position === exitMain
+      );
+      if (!alreadyHas) {
+        results.push({ destination: sprintPath[0], path: sprintPath });
+      }
+    }
+
+    return results;
   }
 
   type PathState = { state: 'main'|'home'|'detour'|'finished', pos: number, detourColor?: PlayerColor, dir: number, history: Token[] };
@@ -283,12 +350,12 @@ export const executeMove = (state: GameState, originalTokenId: string, destinati
 
   // Check captures
   if (destinationToken.state === 'main' || destinationToken.state === 'detour') {
-    const coords = getTokenAbsoluteCoords(destinationToken)!;
-    if (!isSafeSquare(coords)) {
+    const coords = getTokenAbsoluteCoords(destinationToken);
+    if (coords && !isSafeSquare(coords)) {
       newTokens.forEach((t, idx) => {
         if (t.id !== originalTokenId && t.color !== originalToken.color && t.state !== 'base' && t.state !== 'finished') {
-          const tCoords = getTokenAbsoluteCoords(t)!;
-          if (tCoords[0] === coords[0] && tCoords[1] === coords[1]) {
+          const tCoords = getTokenAbsoluteCoords(t);
+          if (tCoords && tCoords[0] === coords[0] && tCoords[1] === coords[1]) {
             // Capture!
             newTokens[idx] = { ...t, state: 'base', position: 0, detourColor: undefined };
             captureOccurred = true;
@@ -341,17 +408,26 @@ export const aiTakeTurn = (state: GameState): { action: 'roll' } | { action: 'mo
     for (const d of dests) {
       let score = 0;
       
-      // 1. Prioritize escaping detour (needs 6)
-      if (t.state === 'detour' && d.state === 'detour') {
-        score += 120;
-      }
-      if (t.state === 'detour' && d.state === 'main') {
-        score += 150; // Getting out is great
+      // 1. In detour: prioritize capturing prey in stairs, advancing towards prey, or escaping
+      if (t.state === 'detour') {
+        const targetStretch = t.detourColor;
+        const hasPrey = state.tokens.some(enemy => 
+          enemy.color === targetStretch && 
+          enemy.state === 'home'
+        );
+
+        if (d.state === 'main') {
+          // Exiting detour: great if no prey left or already captured
+          score += hasPrey ? 110 : 220;
+        } else if (d.state === 'detour') {
+          // Hunting deeper
+          score += hasPrey ? 170 : 80;
+        }
       }
 
       // 2. Prioritize reaching the finished state
       if (d.state === 'finished') {
-        score += 200;
+        score += 250;
       }
 
       // 3. Prioritize captures (hunt)
@@ -366,17 +442,18 @@ export const aiTakeTurn = (state: GameState): { action: 'roll' } | { action: 'mo
             getTokenAbsoluteCoords(enemy)?.[1] === coords[1]
           );
           if (hasEnemy) {
-            score += 150;
+            // Massive score for stair capture vs normal capture
+            score += d.state === 'detour' ? 320 : 180;
           }
         }
       }
 
       // 4. Leaving base on 6 is high priority
       if (t.state === 'base' && d.state === 'main') {
-        score += 80;
+        score += 100;
       }
 
-      // 5. Invasions are high reward if an opponent is in their stairs
+      // 5. Invasions: high reward if an opponent is hiding in their stairs!
       if (d.state === 'detour' && t.state === 'main') {
         const targetStretch = d.detourColor;
         const hasPrey = state.tokens.some(enemy => 
@@ -385,9 +462,9 @@ export const aiTakeTurn = (state: GameState): { action: 'roll' } | { action: 'mo
           enemy.position >= d.position
         );
         if (hasPrey) {
-          score += 90; // Go hunt!
+          score += 190; // Aggressively go hunt!
         } else {
-          score -= 20; // Don't invade empty stairs
+          score -= 30; // Don't invade empty stairs
         }
       }
 

@@ -173,10 +173,10 @@ export const Home: React.FC<{ onNavigate: (screen: 'player_select' | 'online') =
                 </div>
                 <div className="bg-rose-950/40 p-3.5 rounded-2xl border-2 border-rose-500/40">
                   <h4 className="font-black text-rose-300 flex items-center gap-2 mb-1">
-                    <Swords size={16} /> Mode Invasion & Chasse
+                    <Swords size={16} /> Mode Invasion & Chasse Royale
                   </h4>
-                  <p className="text-xs text-rose-100">
-                    Vous pouvez franchir l'entrée de l'escalier d'un adversaire pour aller capturer son pion chez lui. Pour redescendre les marches, un 6 par marche est exigé !
+                  <p className="text-xs text-rose-100 leading-relaxed">
+                    Infiltrez l'escalier d'un adversaire pour le traquer et le capturer chez lui ! Toute capture dans l'escalier donne un lancer bonus. Pour redescendre, repliez-vous pas à pas ou faites un 6 pour un sprint d'évasion direct !
                   </p>
                 </div>
               </div>
