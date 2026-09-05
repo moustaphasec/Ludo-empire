@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { PlayerColor, PLAYER_COLORS } from '../game/constants';
-import { User, Bot, Play, ArrowLeft } from 'lucide-react';
+import { GameMode } from '../game/engine';
+import { User, Bot, Play, ArrowLeft, Zap, ShieldCheck } from 'lucide-react';
 import { playSound } from '../utils/audio';
 
 export const PlayerSelect: React.FC<{
-  onStart: (players: PlayerColor[], types: Record<PlayerColor, 'human' | 'computer'>) => void;
+  onStart: (players: PlayerColor[], types: Record<PlayerColor, 'human' | 'computer'>, mode: GameMode) => void;
   onBack: () => void;
 }> = ({ onStart, onBack }) => {
   const [playerCount, setPlayerCount] = useState<2 | 3 | 4>(2);
+  const [gameMode, setGameMode] = useState<GameMode>('quick');
   const [types, setTypes] = useState<Record<PlayerColor, 'human' | 'computer'>>({
     green: 'human',
     red: 'computer',
@@ -22,7 +24,7 @@ export const PlayerSelect: React.FC<{
     if (playerCount === 3) activePlayers = ['green', 'red', 'blue'];
     if (playerCount === 4) activePlayers = ['green', 'red', 'blue', 'yellow'];
 
-    onStart(activePlayers, types);
+    onStart(activePlayers, types, gameMode);
   };
 
   const toggleType = (color: PlayerColor) => {
@@ -39,20 +41,64 @@ export const PlayerSelect: React.FC<{
     <div className="min-h-[100dvh] bg-[#0d131f] flex flex-col items-center justify-center p-4 sm:p-6 text-white font-sans relative overflow-hidden select-none">
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/30 via-[#0d131f] to-[#0d131f] pointer-events-none" />
 
-      <div className="relative z-10 w-full max-w-[420px] bg-slate-900/80 backdrop-blur-2xl border-2 border-white/10 p-6 sm:p-8 rounded-[2.5rem] shadow-[0_25px_60px_rgba(0,0,0,0.8)]">
-        <h2 className="text-2xl sm:text-3xl font-black text-center mb-6 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500 drop-shadow-md tracking-wide">
+      <div className="relative z-10 w-full max-w-[440px] bg-slate-900/85 backdrop-blur-2xl border-2 border-white/10 p-5 sm:p-7 rounded-[2.5rem] shadow-[0_25px_60px_rgba(0,0,0,0.8)]">
+        <h2 className="text-2xl sm:text-3xl font-black text-center mb-5 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500 drop-shadow-md tracking-wide">
           CONFIGURATION
         </h2>
 
+        {/* Game Mode Selector (Dynamic Quick vs 3-Roll Classic) */}
+        <div className="flex flex-col items-center mb-5">
+          <div className="flex justify-between w-full items-center mb-2 px-1">
+            <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Style de Partie</span>
+            <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1">
+              <ShieldCheck size={13} /> Équité Garantie
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 w-full bg-black/40 p-1.5 rounded-2xl border border-white/10">
+            <button
+              onClick={() => {
+                playSound('click');
+                setGameMode('quick');
+              }}
+              className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                gameMode === 'quick'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Zap size={14} className={gameMode === 'quick' ? 'text-yellow-300 fill-yellow-300' : ''} />
+              <span>⚡ Rapide (1 sorti)</span>
+            </button>
+            <button
+              onClick={() => {
+                playSound('click');
+                setGameMode('classic');
+              }}
+              className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                gameMode === 'classic'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-lg font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>🎲 3 Essais en Base</span>
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1.5 text-center px-2">
+            {gameMode === 'quick' 
+              ? "⚡ Action immédiate : 1 pion déjà sur le terrain + 3 lancers si bloqué !" 
+              : "🎲 Règle officielle : 3 lancers consécutifs par tour en base pour faire un 6 !"}
+          </p>
+        </div>
+
         {/* Player Count Selection */}
-        <div className="flex flex-col items-center mb-6 sm:mb-8">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Nombre de Joueurs</span>
-          <div className="flex justify-center gap-3 sm:gap-4 w-full">
+        <div className="flex flex-col items-center mb-5 sm:mb-6">
+          <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Nombre de Joueurs</span>
+          <div className="flex justify-center gap-2.5 sm:gap-3 w-full">
             {[2, 3, 4].map(num => (
               <button
                 key={num}
                 onClick={() => handleSelectCount(num as 2 | 3 | 4)}
-                className={`flex-1 py-3 rounded-2xl flex items-center justify-center text-lg sm:text-xl font-black border-2 transition-all active:scale-95
+                className={`flex-1 py-2.5 sm:py-3 rounded-2xl flex items-center justify-center text-base sm:text-lg font-black border-2 transition-all active:scale-95
                   ${
                     playerCount === num
                       ? 'bg-gradient-to-tr from-amber-500 to-yellow-400 border-yellow-200 text-slate-950 shadow-[0_0_25px_rgba(234,179,8,0.5)] scale-105'

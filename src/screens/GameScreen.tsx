@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Board } from '../components/Board';
 import { Token as TokenComponent } from '../components/Token';
 import { Dice } from '../components/Dice';
+import { ConfettiEffect, CelebrationType } from '../components/ConfettiEffect';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   GameState, 
+  GameMode,
   createInitialState, 
   executeMove, 
   getTokensWithMoves, 
@@ -13,6 +15,8 @@ import {
   getTokenAbsoluteCoords, 
   advanceTurn, 
   aiTakeTurn, 
+  rollFairDice,
+  isAllPawnsInBase,
   Token 
 } from '../game/engine';
 import { PlayerColor, BASE_POSITIONS } from '../game/constants';
@@ -28,6 +32,7 @@ import {
   ShieldAlert, 
   Trophy, 
   Sparkles,
+  Zap,
   X,
   Smile
 } from 'lucide-react';
@@ -36,6 +41,7 @@ import { playSound, isSoundEnabled, toggleSound } from '../utils/audio';
 interface GameScreenProps {
   players: PlayerColor[];
   playerTypes: Record<PlayerColor, 'human' | 'computer'>;
+  gameMode?: GameMode;
   onQuit: () => void;
 }
 
@@ -45,8 +51,8 @@ interface FloatingEmoji {
   color: PlayerColor;
 }
 
-export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, onQuit }) => {
-  const [gameState, setGameState] = useState<GameState>(createInitialState(players, playerTypes));
+export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, gameMode = 'quick', onQuit }) => {
+  const [gameState, setGameState] = useState<GameState>(createInitialState(players, playerTypes, gameMode));
   const [rolling, setRolling] = useState(false);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [animatingTokenId, setAnimatingTokenId] = useState<string | null>(null);
@@ -54,7 +60,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
   const [showRules, setShowRules] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [floatingEmojis, setFloatingEmojis] = useState<FloatingEmoji[]>([]);
-  const [bannerMessage, setBannerMessage] = useState<string | null>("🎲 Bienvenue ! Que la partie commence !");
+  const [celebration, setCelebration] = useState<{ type: CelebrationType; timestamp: number } | null>(null);
+  const [isShaking, setIsShaking] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState<string | null>(
+    gameMode === 'quick'
+      ? "⚡ Mode Rapide : Pions prêts, que la chasse commence !"
+      : "🎲 3 Essais en base : Obtenez un 6 pour libérer vos pions !"
+  );
 
   const currentPlayerColor = gameState.players[gameState.turnIndex];
   const isComputerTurn = gameState.playerTypes[currentPlayerColor] === 'computer';
@@ -75,10 +87,19 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
 
   const handleRestart = () => {
     playSound('click');
-    setGameState(createInitialState(players, playerTypes));
+    setGameState(createInitialState(players, playerTypes, gameMode));
     setSelectedTokenId(null);
     setAnimatingTokenId(null);
     setBannerMessage("🔄 Nouvelle partie lancée !");
+  };
+
+  const triggerCelebration = (type: CelebrationType) => {
+    setCelebration({ type, timestamp: Date.now() });
+  };
+
+  const triggerShake = () => {
+    setIsShaking(true);
+    setTimeout(() => setIsShaking(false), 400);
   };
 
   const triggerEmoji = (emoji: string) => {
@@ -100,16 +121,30 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
 
     // Detect invasion
     if (move.destination.state === 'detour') {
-      setBannerMessage(`⚔️ INVASION ! ${playerNames[move.destination.color]} chasse dans l'escalier adverse !`);
+      setBannerMessage(`⚔️ INVASION ! ${playerNames[move.destination.color]} traque l'adversaire dans son escalier !`);
     }
+
+    const applyFinalMove = (prev: GameState) => {
+      const next = executeMove(prev, tokenId, move.destination);
+      const prevCaptures = prev.stats[move.destination.color]?.captures || 0;
+      const nextCaptures = next.stats[move.destination.color]?.captures || 0;
+      if (nextCaptures > prevCaptures) {
+        playSound('capture');
+        triggerCelebration('capture');
+        triggerShake();
+        setBannerMessage(`💥 BOOM ! ${playerNames[move.destination.color]} a éliminé un pion ! Rejouez !`);
+      } else if (next.winner) {
+        playSound('win');
+        triggerCelebration('win');
+      } else if (prev.diceValue === 6) {
+        playSound('bonus');
+      }
+      return next;
+    };
 
     if (move.path.length <= 1) {
       playSound('move');
-      setGameState(prev => {
-        const next = executeMove(prev, tokenId, move.destination);
-        if (next.winner) playSound('win');
-        return next;
-      });
+      setGameState(applyFinalMove);
       setAnimatingTokenId(null);
       return;
     }
@@ -128,11 +163,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
       } else {
         clearInterval(interval);
         playSound('move');
-        setGameState(prev => {
-          const next = executeMove(prev, tokenId, move.destination);
-          if (next.winner) playSound('win');
-          return next;
-        });
+        setGameState(applyFinalMove);
         setAnimatingTokenId(null);
       }
     }, 180);
@@ -162,21 +193,73 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
                 setGameState(prev => executeMove(prev, aiAction.tokenId, aiAction.destination));
               }
             }
+          } else if (aiAction && aiAction.action === 'roll') {
+            // AI still has attempts left in base!
+            playSound('miss');
+            setBannerMessage(`❌ ${playerNames[currentPlayerColor]} rate le 6 (Essai ${gameState.baseAttempt}/3). Nouvelle tentative...`);
+            setGameState(prev => ({
+              ...prev,
+              hasRolled: false,
+              rollsLeftInTurn: prev.rollsLeftInTurn - 1,
+              baseAttempt: prev.baseAttempt + 1
+            }));
           } else if (!aiAction) {
-            setGameState(advanceTurn(gameState));
+            // AI has no moves and no rolls left
+            const inBase = isAllPawnsInBase(gameState, currentPlayerColor);
+            playSound('miss');
+            if (inBase) {
+              setBannerMessage(`🔒 3 essais infructueux pour ${playerNames[currentPlayerColor]}. Tour suivant...`);
+            } else {
+              setBannerMessage(`Aucun coup possible pour ${playerNames[currentPlayerColor]}. Tour suivant...`);
+            }
+            setGameState(prev => {
+              const nextConsecutive = { ...prev.consecutiveTurnsWithoutExit };
+              if (inBase) {
+                nextConsecutive[currentPlayerColor] = (nextConsecutive[currentPlayerColor] || 0) + 1;
+              }
+              return advanceTurn({ ...prev, consecutiveTurnsWithoutExit: nextConsecutive });
+            });
           }
         }
-      }, 900);
+      }, 850);
       return () => clearTimeout(timer);
     } else {
       if (gameState.hasRolled && !animatingTokenId) {
         const validTokens = getTokensWithMoves(gameState, currentPlayerColor);
         if (validTokens.length === 0) {
-          setBannerMessage(`Aucun coup possible pour ${playerNames[currentPlayerColor]}. Tour suivant...`);
-          const timer = setTimeout(() => {
-            setGameState(advanceTurn(gameState));
-          }, 1400);
-          return () => clearTimeout(timer);
+          // Human rolled but no moves possible
+          if (gameState.rollsLeftInTurn > 1) {
+            playSound('miss');
+            const attemptsLeft = gameState.rollsLeftInTurn - 1;
+            setBannerMessage(`❌ Pas de 6 (Essai ${gameState.baseAttempt}/3). Relancez le dé ! (${attemptsLeft} essai${attemptsLeft > 1 ? 's' : ''} restant${attemptsLeft > 1 ? 's' : ''})`);
+            const timer = setTimeout(() => {
+              setGameState(prev => ({
+                ...prev,
+                hasRolled: false,
+                rollsLeftInTurn: prev.rollsLeftInTurn - 1,
+                baseAttempt: prev.baseAttempt + 1
+              }));
+            }, 1000);
+            return () => clearTimeout(timer);
+          } else {
+            playSound('miss');
+            const inBase = isAllPawnsInBase(gameState, currentPlayerColor);
+            if (inBase) {
+              setBannerMessage(`🔒 3 essais infructueux pour ${playerNames[currentPlayerColor]}. Tour suivant...`);
+            } else {
+              setBannerMessage(`Aucun coup possible pour ${playerNames[currentPlayerColor]}. Tour suivant...`);
+            }
+            const timer = setTimeout(() => {
+              setGameState(prev => {
+                const nextConsecutive = { ...prev.consecutiveTurnsWithoutExit };
+                if (inBase) {
+                  nextConsecutive[currentPlayerColor] = (nextConsecutive[currentPlayerColor] || 0) + 1;
+                }
+                return advanceTurn({ ...prev, consecutiveTurnsWithoutExit: nextConsecutive });
+              });
+            }, 1300);
+            return () => clearTimeout(timer);
+          }
         } else if (validTokens.length === 1 && !selectedTokenId) {
           const moves = getValidMoves(validTokens[0], gameState.diceValue!);
           if (moves.length === 1) {
@@ -200,12 +283,21 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
 
     setTimeout(() => {
       setRolling(false);
-      const diceValue = Math.floor(Math.random() * 6) + 1;
+      const { diceValue, isBoosted } = rollFairDice(gameState);
       if (diceValue === 6) {
         playSound('six');
-        setBannerMessage(`🎉 6 OBTENU ! ${playerNames[currentPlayerColor]} pourra rejouer !`);
+        triggerCelebration('six');
+        if (isBoosted) {
+          setBannerMessage(`🍀 COUP DE POUCE ! 6 magique accordé à ${playerNames[currentPlayerColor]} !`);
+        } else {
+          setBannerMessage(`🎉 6 OBTENU ! ${playerNames[currentPlayerColor]} libère un pion et rejoue !`);
+        }
       } else {
-        setBannerMessage(`Dé : ${diceValue}. Choisissez un pion à avancer.`);
+        if (gameState.rollsLeftInTurn > 1) {
+          setBannerMessage(`Dé : ${diceValue}. Essai ${gameState.baseAttempt}/3 manqué.`);
+        } else {
+          setBannerMessage(`Dé : ${diceValue}. Choisissez un pion à avancer.`);
+        }
       }
       setGameState(prev => ({ ...prev, hasRolled: true, diceValue }));
     }, 550);
@@ -273,6 +365,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
     <div className="h-[100dvh] bg-[#121824] flex flex-col p-2 sm:p-3 relative overflow-hidden select-none">
       {/* Ambient background glows */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/35 via-slate-950/60 to-[#0b0f19] pointer-events-none" />
+
+      {/* DYNAMIC CELEBRATION PARTICLES / CONFETTI */}
+      <ConfettiEffect trigger={celebration} />
 
       {/* FLOATING EMOJIS */}
       {floatingEmojis.map(item => (
@@ -411,8 +506,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
         {/* BOARD CONTAINER */}
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.6, type: 'spring', bounce: 0.4 }}
+          animate={
+            isShaking
+              ? { x: [-7, 7, -5, 5, -2, 2, 0], y: [-3, 3, -2, 2, 0], scale: [1, 1.02, 1] }
+              : { scale: 1, opacity: 1, x: 0, y: 0 }
+          }
+          transition={isShaking ? { duration: 0.35 } : { duration: 0.6, type: 'spring', bounce: 0.4 }}
           className="w-full flex-1 max-h-[58vh] sm:max-h-[63vh] flex justify-center items-center shrink min-h-[290px]"
         >
           <div className="h-full aspect-square max-w-full relative shadow-[0_20px_50px_rgba(0,0,0,0.8)] rounded-[1.8rem]">
@@ -533,37 +632,56 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
                 </div>
               </div>
 
-              <div className="space-y-4 text-sm leading-relaxed text-slate-200">
-                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10">
-                  <h4 className="font-bold text-emerald-400 mb-1 flex items-center gap-1.5">
-                    <span>🎲</span> Sortie de base & Déplacements
+              <div className="space-y-3.5 text-sm leading-relaxed text-slate-200">
+                <div className="bg-emerald-950/40 p-3.5 rounded-2xl border border-emerald-400/30">
+                  <h4 className="font-bold text-emerald-300 mb-1 flex items-center gap-1.5">
+                    <span>🎲</span> Règle des 3 Lancers & Sortie de Base
                   </h4>
-                  <p className="text-xs text-slate-300">
-                    Faites un <strong>6</strong> pour faire sortir un pion de votre maison. Chaque 6 vous accorde un tour supplémentaire immédiat !
+                  <p className="text-xs text-slate-200">
+                    Lorsque tous vos pions sont en base, vous bénéficiez de <strong>3 lancers consécutifs</strong> par tour pour tenter de faire un <strong>6</strong> ! Obtenir un 6 libère votre pion et vous donne un tour bonus immédiat.
+                  </p>
+                </div>
+
+                <div className="bg-amber-950/40 p-3.5 rounded-2xl border border-amber-400/30">
+                  <h4 className="font-bold text-amber-300 mb-1 flex items-center gap-1.5">
+                    <span>🛡️</span> Équité & Protection Anti-Poisse
+                  </h4>
+                  <p className="text-xs text-slate-200">
+                    Fini de rester coincé pendant que les autres avancent ! Si vous subissez 2 tours sans sortir, le destin vous accorde une chance boostée garantie pour que la partie reste équilibrée, fun et dynamique pour tous.
+                  </p>
+                </div>
+
+                <div className="bg-cyan-950/40 p-3.5 rounded-2xl border border-cyan-400/30">
+                  <h4 className="font-bold text-cyan-300 mb-1 flex items-center gap-1.5">
+                    <span>⚡</span> Deux Modes de Jeu au Choix
+                  </h4>
+                  <p className="text-xs text-slate-200">
+                    <strong>Mode Rapide :</strong> 1 pion démarre déjà sur le terrain pour une action immédiate dès la première seconde !<br />
+                    <strong>Mode Classique :</strong> Tous les pions démarrent en base avec les 3 lancers par tour.
                   </p>
                 </div>
 
                 <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10">
                   <h4 className="font-bold text-amber-400 mb-1 flex items-center gap-1.5">
-                    <span>⭐</span> Cases Sécurisées
+                    <span>⭐</span> Cases Étoilées Sécurisées
                   </h4>
                   <p className="text-xs text-slate-300">
-                    Les cases marquées d'une étoile dorée étincelante sont des zones de paix : aucun pion ne peut y être capturé !
+                    Les cases marquées d'une étoile dorée étincelante sont des havres de paix : aucun pion ne peut y être capturé !
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-br from-rose-900/40 to-amber-900/40 p-4 rounded-2xl border-2 border-rose-500/50 shadow-inner">
-                  <h4 className="font-black text-rose-300 text-base mb-1.5 flex items-center gap-2">
+                <div className="bg-gradient-to-br from-rose-900/40 to-amber-900/40 p-3.5 rounded-2xl border-2 border-rose-500/50 shadow-inner">
+                  <h4 className="font-black text-rose-300 text-base mb-1 flex items-center gap-2">
                     <Swords size={18} className="text-rose-400" />
                     Règle Exclusive : Invasion & Chasse !
                   </h4>
-                  <p className="text-xs text-rose-100 mb-2">
+                  <p className="text-xs text-rose-100 mb-1.5">
                     Lorsque vous atteignez l'entrée de l'escalier d'un adversaire, vous pouvez <strong>entrer dans son escalier</strong> pour le traquer et le capturer chez lui !
                   </p>
-                  <div className="flex items-start gap-2 bg-black/40 p-2.5 rounded-xl border border-rose-400/30 text-xs">
-                    <ShieldAlert size={18} className="text-amber-400 shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2 bg-black/40 p-2 rounded-xl border border-rose-400/30 text-xs">
+                    <ShieldAlert size={16} className="text-amber-400 shrink-0 mt-0.5" />
                     <span>
-                      <strong>Pour redescendre :</strong> Après l'invasion, pour faire marche arrière et vous échapper de l'escalier ennemi, vous devez obligatoirement obtenir un <strong>6</strong> par marche !
+                      <strong>Pour redescendre :</strong> Après l'invasion, pour vous échapper de l'escalier ennemi, vous devez obtenir un <strong>6</strong> par marche !
                     </span>
                   </div>
                 </div>
@@ -715,28 +833,54 @@ const PlayerCorner: React.FC<PlayerCornerProps> = ({
 
       {/* DICE AREA (Only for Current Player) */}
       {isCurrent && (
-        <div className="flex items-center gap-1.5 sm:gap-2 z-30">
-          {!isLeft && !gameState.hasRolled && !isComputerTurn && !rolling && (
-            <motion.div animate={{ x: [0, -6, 0] }} transition={{ duration: 0.9, repeat: Infinity }} className="text-xl sm:text-2xl drop-shadow">
-              👉
-            </motion.div>
+        <div className="flex flex-col items-center gap-1 z-30">
+          {/* Base Attempts Badge (3 Rolls when all in Base) */}
+          {isAllPawnsInBase(gameState, color) && (
+            <div className="bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full border border-amber-400/50 shadow-lg text-[9px] font-black text-amber-300 flex items-center gap-1.5 animate-pulse">
+              <span>🎯 Essai {gameState.baseAttempt}/3</span>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3].map(step => (
+                  <div
+                    key={step}
+                    className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                      step === gameState.baseAttempt
+                        ? 'bg-amber-400 ring-1 ring-amber-200 scale-125'
+                        : step < gameState.baseAttempt
+                        ? 'bg-slate-600'
+                        : 'bg-white/30'
+                    }`}
+                  />
+                ))}
+              </div>
+              {gameState.consecutiveTurnsWithoutExit[color] >= 2 && (
+                <span className="text-[8px] text-emerald-400 font-black">🍀 Chance</span>
+              )}
+            </div>
           )}
 
-          <div className="scale-85 sm:scale-100 origin-center">
-            <Dice
-              value={gameState.diceValue}
-              rolling={rolling}
-              onClick={!isComputerTurn && !gameState.hasRolled && !rolling ? handleRoll : undefined}
-              color={color}
-              canRoll={!gameState.hasRolled && !rolling}
-            />
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {!isLeft && !gameState.hasRolled && !isComputerTurn && !rolling && (
+              <motion.div animate={{ x: [0, -6, 0] }} transition={{ duration: 0.9, repeat: Infinity }} className="text-xl sm:text-2xl drop-shadow">
+                👉
+              </motion.div>
+            )}
+
+            <div className="scale-85 sm:scale-100 origin-center">
+              <Dice
+                value={gameState.diceValue}
+                rolling={rolling}
+                onClick={!isComputerTurn && !gameState.hasRolled && !rolling ? handleRoll : undefined}
+                color={color}
+                canRoll={!gameState.hasRolled && !rolling}
+              />
+            </div>
+
+            {isLeft && !gameState.hasRolled && !isComputerTurn && !rolling && (
+              <motion.div animate={{ x: [0, 6, 0] }} transition={{ duration: 0.9, repeat: Infinity }} className="text-xl sm:text-2xl drop-shadow">
+                👈
+              </motion.div>
+            )}
           </div>
-
-          {isLeft && !gameState.hasRolled && !isComputerTurn && !rolling && (
-            <motion.div animate={{ x: [0, 6, 0] }} transition={{ duration: 0.9, repeat: Infinity }} className="text-xl sm:text-2xl drop-shadow">
-              👈
-            </motion.div>
-          )}
         </div>
       )}
     </div>
