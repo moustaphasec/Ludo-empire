@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Bot, Users, Globe, Volume2, VolumeX, HelpCircle, Crown, Swords, ShieldAlert, X } from 'lucide-react';
 import { playSound, isSoundEnabled, toggleSound } from '../utils/audio';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PwaInstallBanner } from '../components/PwaInstallBanner';
 
 export const Home: React.FC<{ onNavigate: (screen: 'player_select' | 'online') => void }> = ({ onNavigate }) => {
   const [soundOn, setSoundOn] = useState(isSoundEnabled());
@@ -19,7 +20,7 @@ export const Home: React.FC<{ onNavigate: (screen: 'player_select' | 'online') =
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#0d131f] flex flex-col items-center justify-between p-4 sm:p-6 text-white font-sans relative overflow-hidden select-none">
+    <div className="min-h-[100dvh] bg-[#0d131f] flex flex-col items-center justify-between p-4 sm:p-6 text-white font-sans relative overflow-x-hidden overflow-y-auto select-none">
       {/* Dynamic ambient lights */}
       <div className="absolute -top-32 -left-32 w-80 h-80 bg-emerald-600/20 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-rose-600/20 rounded-full blur-[100px] pointer-events-none" />
@@ -120,8 +121,9 @@ export const Home: React.FC<{ onNavigate: (screen: 'player_select' | 'online') =
         </div>
       </div>
 
-      {/* Bottom Section: Online Button */}
-      <div className="w-full max-w-sm relative z-10 shrink-0 mb-3">
+      {/* Bottom Section: PWA Install & Online Button */}
+      <div className="w-full max-w-sm relative z-10 shrink-0 mb-3 flex flex-col gap-2">
+        <PwaInstallBanner />
         <button
           onClick={() => handleNavigation('online')}
           className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 border-2 border-blue-400/50 py-3.5 rounded-2xl flex justify-center items-center gap-3 shadow-[0_12px_25px_rgba(37,99,235,0.4)] hover:scale-[1.02] active:scale-95 transition-all overflow-hidden relative group"

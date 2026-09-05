@@ -1,0 +1,39 @@
+{
+  "name": "Ludo Empire - Moderne & Chasse",
+  "short_name": "Ludo Empire",
+  "description": "Jeu de Ludo moderne, interactif et multijoueur. Jouez en ligne ou hors ligne sans connexion !",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#0d131f",
+  "theme_color": "#0d131f",
+  "orientation": "portrait",
+  "lang": "fr",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
