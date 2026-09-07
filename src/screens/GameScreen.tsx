@@ -169,7 +169,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ players, playerTypes, on
         setGameState(applyFinalMove);
         setAnimatingTokenId(null);
       }
-    }, 180);
+    }, 155);
   };
 
   useEffect(() => {

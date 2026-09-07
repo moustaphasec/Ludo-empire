@@ -53,10 +53,10 @@ export const ENTRANCES: Record<PlayerColor, number> = {
 };
 
 export const BASE_POSITIONS: Record<PlayerColor, number[][]> = {
-  green: [[2, 2], [2, 4], [4, 2], [4, 4]],
-  red: [[2, 11], [2, 13], [4, 11], [4, 13]],
-  blue: [[11, 11], [11, 13], [13, 11], [13, 13]],
-  yellow: [[11, 2], [11, 4], [13, 2], [13, 4]],
+  green: [[2, 1.5], [2, 3.5], [4, 1.5], [4, 3.5]],
+  red: [[2, 10.5], [2, 12.5], [4, 10.5], [4, 12.5]],
+  blue: [[11, 10.5], [11, 12.5], [13, 10.5], [13, 12.5]],
+  yellow: [[11, 1.5], [11, 3.5], [13, 1.5], [13, 3.5]],
 };
 
 export const PLAYER_COLORS = ['green', 'red', 'blue', 'yellow'] as const;

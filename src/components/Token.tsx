@@ -79,12 +79,12 @@ export const Token: React.FC<TokenProps> = ({
       initial={{ scale: 0, opacity: 0 }}
       animate={{ top, left, scale: 1, opacity: 1 }}
       transition={{
-        top: { type: 'spring', stiffness: 220, damping: 22, mass: 0.8 },
-        left: { type: 'spring', stiffness: 220, damping: 22, mass: 0.8 },
+        top: { type: 'tween', duration: 0.15, ease: 'easeInOut' },
+        left: { type: 'tween', duration: 0.15, ease: 'easeInOut' },
         scale: { type: 'spring', stiffness: 350, damping: 18 }
       }}
       onClick={isPlayable || isGhost ? onClick : undefined}
-      className={`absolute w-[5.5%] h-[5.5%] -ml-[2.75%] -mt-[3.75%] pointer-events-auto flex items-center justify-center 
+      className={`absolute w-[5.5%] h-[5.5%] -ml-[2.75%] -mt-[2.75%] pointer-events-auto flex items-center justify-center 
         ${isPlayable ? 'cursor-pointer z-30 group' : 'z-20'}
         ${isGhost ? 'opacity-65 cursor-pointer z-40' : ''}
       `}
@@ -147,7 +147,7 @@ export const Token: React.FC<TokenProps> = ({
         {/* 3D Pawn SVG */}
         <svg
           viewBox="0 0 100 130"
-          className="w-[220%] h-[220%] absolute -top-[65%] -left-[60%] pointer-events-none drop-shadow-[0_10px_10px_rgba(0,0,0,0.55)]"
+          className="w-[190%] h-[190%] absolute -top-[50%] -left-[45%] pointer-events-none drop-shadow-[0_10px_10px_rgba(0,0,0,0.55)]"
         >
           <defs>
             {/* Radial gradient for sphere head */}
